@@ -1,0 +1,237 @@
+classDiagram
+
+    class User {
+        +UUID id
+        +String firebaseUid
+        +String email
+        +String fullName
+        +String displayName
+        +String profilePictureUrl
+        +Date dateOfBirth
+        +String gender
+        +String city
+        +String country
+        +Boolean isActive
+        +getProfile() Profile
+        +updateProfile(data) User
+        +getSportProfiles() List~PlayerSportProfile~
+        +getStatistics(sportId) PlayerStatistics
+    }
+
+    class Sport {
+        +UUID id
+        +String name
+        +String code
+        +Boolean isTeamSport
+        +JSON defaultMatchFormat
+        +Boolean isActive
+        +getRules() MatchFormat
+    }
+
+    class PlayerSportProfile {
+        +UUID id
+        +UUID userId
+        +UUID sportId
+        +String skillLevel
+        +Integer rankingPoints
+        +Boolean isPrimarySport
+    }
+
+    class Team {
+        +UUID id
+        +UUID sportId
+        +String name
+        +String shortName
+        +String logoUrl
+        +UUID captainId
+        +UUID viceCaptainId
+        +Boolean isActive
+        +addMember(user, role) TeamMember
+        +removeMember(userId) void
+        +setCaptain(userId) void
+        +getRoster() List~TeamMember~
+        +getStatistics() TeamStatistics
+    }
+
+    class TeamMember {
+        +UUID id
+        +UUID teamId
+        +UUID userId
+        +String role
+        +DateTime joinedAt
+        +DateTime leftAt
+        +Boolean isActive
+    }
+
+    class Tournament {
+        +UUID id
+        +UUID sportId
+        +UUID organizerId
+        +String name
+        +String format
+        +String participantKind
+        +Date startDate
+        +Date endDate
+        +String status
+        +registerParticipant(entity) TournamentParticipant
+        +generateFixtures() List~Match~
+        +updateStandings() void
+        +completeTournament() void
+    }
+
+    class TournamentParticipant {
+        +UUID id
+        +UUID tournamentId
+        +UUID userId
+        +UUID teamId
+        +Integer seedNumber
+        +String status
+    }
+
+    class TournamentRound {
+        +UUID id
+        +UUID tournamentId
+        +Integer roundNumber
+        +String roundName
+    }
+
+    class TournamentStanding {
+        +UUID id
+        +UUID tournamentId
+        +UUID userId
+        +UUID teamId
+        +Integer matchesPlayed
+        +Integer wins
+        +Integer losses
+        +Integer points
+        +Integer position
+    }
+
+    class Match {
+        +UUID id
+        +UUID sportId
+        +UUID tournamentId
+        +UUID tournamentRoundId
+        +String matchType
+        +JSON matchFormat
+        +DateTime scheduledAt
+        +DateTime startedAt
+        +DateTime finishedAt
+        +String status
+        +String winnerSide
+        +startMatch() void
+        +pauseMatch() void
+        +resumeMatch() void
+        +recordPoint(side) MatchPoint
+        +undoLastPoint() void
+        +completeMatch() void
+        +cancelMatch(reason) void
+        +getCurrentScore() ScoreSnapshot
+        +getTimeline() List~MatchPoint~
+    }
+
+    class MatchParticipant {
+        +UUID id
+        +UUID matchId
+        +String side
+        +UUID userId
+        +UUID teamId
+        +Boolean isWinner
+    }
+
+    class MatchSet {
+        +UUID id
+        +UUID matchId
+        +Integer setNumber
+        +Integer sideAScore
+        +Integer sideBScore
+        +String winnerSide
+        +DateTime startedAt
+        +DateTime endedAt
+    }
+
+    class MatchPoint {
+        +UUID id
+        +UUID matchId
+        +UUID matchSetId
+        +Integer pointNumber
+        +String scoringSide
+        +Integer sideAScoreAfter
+        +Integer sideBScoreAfter
+        +Boolean isUndone
+        +UUID recordedBy
+        +DateTime recordedAt
+    }
+
+    class MatchStatusLog {
+        +UUID id
+        +UUID matchId
+        +String previousStatus
+        +String newStatus
+        +UUID changedBy
+        +String reason
+    }
+
+    class PlayerStatistics {
+        +UUID id
+        +UUID userId
+        +UUID sportId
+        +Integer matchesPlayed
+        +Integer matchesWon
+        +Integer matchesLost
+        +Integer setsWon
+        +Integer setsLost
+        +Numeric winPercentage
+        +Integer currentRankingPoints
+        +recalculate(match) void
+    }
+
+    class TeamStatistics {
+        +UUID id
+        +UUID teamId
+        +Integer matchesPlayed
+        +Integer matchesWon
+        +Integer matchesLost
+        +Numeric winPercentage
+        +recalculate(match) void
+    }
+
+    class LeaderboardService {
+        <<service>>
+        +getPlayerLeaderboard(sportId, filters) List~PlayerStatistics~
+        +getTeamLeaderboard(sportId, filters) List~TeamStatistics~
+        +getTournamentChampions(tournamentId) List~TournamentStanding~
+    }
+
+    %% Relationships
+    User "1" --> "0..*" PlayerSportProfile : has
+    Sport "1" --> "0..*" PlayerSportProfile : defines
+
+    User "1" --> "0..*" Team : creates
+    Sport "1" --> "0..*" Team : categorizes
+    Team "1" --> "0..*" TeamMember : has
+    User "1" --> "0..*" TeamMember : is
+
+    User "1" --> "0..*" Tournament : organizes
+    Sport "1" --> "0..*" Tournament : categorizes
+    Tournament "1" --> "0..*" TournamentParticipant : has
+    Tournament "1" --> "0..*" TournamentRound : structures
+    Tournament "1" --> "0..*" TournamentStanding : tracks
+    User "0..1" --> "0..*" TournamentParticipant : registers
+    Team "0..1" --> "0..*" TournamentParticipant : registers
+
+    Sport "1" --> "0..*" Match : categorizes
+    Tournament "0..1" --> "0..*" Match : contains
+    TournamentRound "0..1" --> "0..*" Match : schedules
+    Match "1" --> "2..*" MatchParticipant : has
+    Match "1" --> "1..*" MatchSet : has
+    MatchSet "1" --> "0..*" MatchPoint : logs
+    Match "1" --> "0..*" MatchStatusLog : audits
+
+    User "1" --> "0..*" PlayerStatistics : aggregated_as
+    Sport "1" --> "0..*" PlayerStatistics : per_sport
+    Team "1" --> "0..1" TeamStatistics : aggregated_as
+
+    LeaderboardService ..> PlayerStatistics : reads
+    LeaderboardService ..> TeamStatistics : reads
+    LeaderboardService ..> TournamentStanding : reads
