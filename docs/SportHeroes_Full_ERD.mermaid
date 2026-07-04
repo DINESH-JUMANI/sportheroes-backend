@@ -1,0 +1,266 @@
+erDiagram
+    USERS ||--o{ PLAYER_SPORT_PROFILES : "plays"
+    SPORTS ||--o{ PLAYER_SPORT_PROFILES : "categorizes"
+    SPORTS ||--o{ SPORT_EVENT_TYPES : "defines"
+
+    SPORTS ||--o{ TEAMS : "categorizes"
+    USERS ||--o{ TEAMS : "creates"
+    TEAMS ||--o{ TEAM_MEMBERS : "has roster"
+    USERS ||--o{ TEAM_MEMBERS : "joins"
+
+    SPORTS ||--o{ TOURNAMENTS : "categorizes"
+    USERS ||--o{ TOURNAMENTS : "organizes"
+    TOURNAMENTS ||--o{ TOURNAMENT_PARTICIPANTS : "has"
+    USERS ||--o{ TOURNAMENT_PARTICIPANTS : "registers as"
+    TEAMS ||--o{ TOURNAMENT_PARTICIPANTS : "registers as"
+    TOURNAMENTS ||--o{ TOURNAMENT_ROUNDS : "has stages"
+    TOURNAMENTS ||--o{ TOURNAMENT_STANDINGS : "tracks"
+    USERS ||--o{ TOURNAMENT_STANDINGS : "ranked in"
+    TEAMS ||--o{ TOURNAMENT_STANDINGS : "ranked in"
+
+    SPORTS ||--o{ MATCHES : "categorizes"
+    TOURNAMENTS ||--o{ MATCHES : "contains"
+    TOURNAMENT_ROUNDS ||--o{ MATCHES : "schedules"
+    USERS ||--o{ MATCHES : "creates"
+    MATCHES ||--o{ MATCH_PARTICIPANTS : "has"
+    USERS ||--o{ MATCH_PARTICIPANTS : "plays in"
+    TEAMS ||--o{ MATCH_PARTICIPANTS : "plays in"
+    MATCHES ||--o{ MATCH_SETS : "has"
+    MATCH_SETS ||--o{ MATCH_POINTS : "logs"
+    MATCHES ||--o{ MATCH_POINTS : "logs"
+    SPORT_EVENT_TYPES ||--o{ MATCH_POINTS : "tags"
+    USERS ||--o{ MATCH_POINTS : "records"
+    MATCHES ||--o{ MATCH_STATUS_LOGS : "audits"
+    USERS ||--o{ MATCH_STATUS_LOGS : "changes"
+
+    USERS ||--o{ PLAYER_STATISTICS : "has (universal)"
+    SPORTS ||--o{ PLAYER_STATISTICS : "per sport"
+    TEAMS ||--o{ TEAM_STATISTICS : "has (universal)"
+
+    USERS ||--o| PLAYER_TABLE_TENNIS : "sport-specific stats"
+    USERS ||--o| PLAYER_BADMINTON : "sport-specific stats"
+    USERS ||--o| PLAYER_VOLLEYBALL : "sport-specific stats"
+    USERS ||--o| PLAYER_PICKLEBALL : "sport-specific stats"
+    TEAMS ||--o| TEAM_VOLLEYBALL : "sport-specific stats"
+
+    %% ===================== CORE SCHEMA =====================
+
+    USERS {
+        uuid id PK
+        string firebase_uid
+        string email
+        string full_name
+        string display_name
+        date date_of_birth
+        string gender
+        string city
+        string country
+        boolean is_active
+    }
+
+    SPORTS {
+        uuid id PK
+        string name
+        string code
+        boolean is_team_sport
+        jsonb default_match_format
+        boolean is_active
+    }
+
+    SPORT_EVENT_TYPES {
+        uuid id PK
+        uuid sport_id FK
+        string code
+        string label
+        boolean is_positive
+    }
+
+    PLAYER_SPORT_PROFILES {
+        uuid id PK
+        uuid user_id FK
+        uuid sport_id FK
+        string skill_level
+        int ranking_points
+        boolean is_primary_sport
+    }
+
+    TEAMS {
+        uuid id PK
+        uuid sport_id FK
+        string name
+        uuid captain_id FK
+        uuid vice_captain_id FK
+        uuid created_by FK
+        boolean is_active
+    }
+
+    TEAM_MEMBERS {
+        uuid id PK
+        uuid team_id FK
+        uuid user_id FK
+        string role
+        boolean is_active
+    }
+
+    TOURNAMENTS {
+        uuid id PK
+        uuid sport_id FK
+        uuid organizer_id FK
+        string name
+        string format
+        string participant_kind
+        date start_date
+        date end_date
+        string status
+    }
+
+    TOURNAMENT_PARTICIPANTS {
+        uuid id PK
+        uuid tournament_id FK
+        uuid user_id FK
+        uuid team_id FK
+        int seed_number
+        string status
+    }
+
+    TOURNAMENT_ROUNDS {
+        uuid id PK
+        uuid tournament_id FK
+        int round_number
+        string round_name
+    }
+
+    TOURNAMENT_STANDINGS {
+        uuid id PK
+        uuid tournament_id FK
+        uuid user_id FK
+        uuid team_id FK
+        int matches_played
+        int wins
+        int losses
+        int points
+        int position
+    }
+
+    MATCHES {
+        uuid id PK
+        uuid sport_id FK
+        uuid tournament_id FK
+        uuid tournament_round_id FK
+        string match_type
+        jsonb match_format
+        timestamptz scheduled_at
+        string status
+        string winner_side
+        uuid created_by FK
+    }
+
+    MATCH_PARTICIPANTS {
+        uuid id PK
+        uuid match_id FK
+        string side
+        uuid user_id FK
+        uuid team_id FK
+        boolean is_winner
+    }
+
+    MATCH_SETS {
+        uuid id PK
+        uuid match_id FK
+        int set_number
+        int side_a_score
+        int side_b_score
+        string winner_side
+    }
+
+    MATCH_POINTS {
+        uuid id PK
+        uuid match_id FK
+        uuid match_set_id FK
+        uuid event_type_id FK
+        int point_number
+        string scoring_side
+        int side_a_score_after
+        int side_b_score_after
+        jsonb metadata
+        boolean is_undone
+        uuid recorded_by FK
+    }
+
+    MATCH_STATUS_LOGS {
+        uuid id PK
+        uuid match_id FK
+        string previous_status
+        string new_status
+        uuid changed_by FK
+    }
+
+    PLAYER_STATISTICS {
+        uuid id PK
+        uuid user_id FK
+        uuid sport_id FK
+        int matches_played
+        int matches_won
+        int matches_lost
+        int sets_won
+        int sets_lost
+        numeric win_percentage
+        int current_ranking_points
+    }
+
+    TEAM_STATISTICS {
+        uuid id PK
+        uuid team_id FK
+        int matches_played
+        int matches_won
+        int matches_lost
+        numeric win_percentage
+    }
+
+    %% ================= SPORT_STATS SCHEMA =================
+
+    PLAYER_TABLE_TENNIS {
+        uuid user_id PK_FK
+        int total_aces
+        int total_serve_errors
+        int total_receive_errors
+        int total_rallies_won
+        int longest_win_streak
+        int current_win_streak
+    }
+
+    PLAYER_BADMINTON {
+        uuid user_id PK_FK
+        int total_smash_winners
+        int total_net_kills
+        int total_service_faults
+        int total_unforced_errors
+        int longest_win_streak
+        int current_win_streak
+    }
+
+    PLAYER_VOLLEYBALL {
+        uuid user_id PK_FK
+        int total_kills
+        int total_blocks
+        int total_digs
+        int total_service_aces
+        int total_attack_errors
+        numeric attack_efficiency
+    }
+
+    PLAYER_PICKLEBALL {
+        uuid user_id PK_FK
+        int total_dinks_won
+        int total_drives_won
+        int total_kitchen_violations
+        int total_unforced_errors
+    }
+
+    TEAM_VOLLEYBALL {
+        uuid team_id PK_FK
+        int total_kills
+        int total_blocks
+        int total_digs
+        int total_service_aces
+    }
