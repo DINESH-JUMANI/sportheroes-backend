@@ -1,28 +1,38 @@
 import dotenv from 'dotenv';
-// Load environment variables before importing any config/routes
+
 dotenv.config();
 
 import app from './app';
-import { testConnection } from './config/database';
-
-const PORT = process.env.PORT || 3000;
+import { assertConfig, config } from './config/config';
+import { initFirebase } from './config/firebase';
+import { prisma } from './config/prisma';
+import { Logger } from './utils/logger';
 
 async function bootstrap() {
-  console.log('[Server] Initializing Sport Heroes backend...');
+  Logger.info('Initializing Sport Heroes backend...');
 
-  // Verify database connection at startup
-  const dbConnected = await testConnection();
-  if (!dbConnected) {
-    console.warn('[Server] WARNING: Server is starting without database connectivity. Check your DATABASE_URL in .env');
+  assertConfig();
+  initFirebase();
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    Logger.info('Database connected successfully via Prisma');
+  } catch (error) {
+    Logger.warn('Server is starting without database connectivity. Check DATABASE_URL in .env');
+    Logger.error('Database connection failed', error);
   }
 
-  app.listen(PORT, () => {
-    console.log(`[Server] Server is running on http://localhost:${PORT}`);
-    console.log(`[Server] Health check endpoint: http://localhost:${PORT}/health`);
+  app.listen(config.port, () => {
+    Logger.info(`Server is running on http://localhost:${config.port}`);
+    Logger.info(`Health check: http://localhost:${config.port}/health`);
+    if (config.swagger.enabled) {
+      Logger.info(`Swagger docs: http://localhost:${config.port}/api/docs`);
+    }
   });
 }
 
-bootstrap().catch((error) => {
-  console.error('[Server] Critical bootstrap error:', error);
+bootstrap().catch(async (error) => {
+  Logger.error('Critical bootstrap error', error);
+  await prisma.$disconnect();
   process.exit(1);
 });

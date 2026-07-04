@@ -1,61 +1,73 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { testConnection } from './config/database';
+import swaggerUi from 'swagger-ui-express';
+import { config } from './config/config';
+import { prisma } from './config/prisma';
+import { swaggerSpec } from './config/swagger';
+import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+import { requestLogger } from './middleware/request-logger.middleware';
+import authRoutes from './modules/auth/auth.routes';
 import matchRouter from './modules/matches/match-router';
+import { Logger } from './utils/logger';
 
 const app = express();
 
-// Enable CORS
 app.use(cors());
-
-// Parse JSON request bodies
 app.use(express.json());
+app.use(requestLogger);
 
-// Logger middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+if (config.swagger.enabled) {
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.get('/api/docs.json', (_req: Request, res: Response) => {
+    res.json(swaggerSpec);
+  });
+}
 
-// Register routes
+app.use('/api/v1/auth', authRoutes);
 app.use('/matches', matchRouter);
 
-// Health check endpoint
-app.get('/health', async (req: Request, res: Response) => {
-  const dbConnected = await testConnection();
+app.get('/health', async (_req: Request, res: Response) => {
+  let dbConnected = false;
 
-
-  if (dbConnected) {
-    res.status(200).json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      services: {
-        database: 'connected',
-        server: 'running',
-      },
-    });
-  } else {
-    res.status(500).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      services: {
-        database: 'disconnected',
-        server: 'running',
-      },
-    });
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbConnected = true;
+    Logger.debug('Health check: database connected');
+  } catch (error) {
+    Logger.error('Health check: database disconnected', error);
+    dbConnected = false;
   }
-});
 
-// Default root endpoint
-app.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: 'Welcome to Sport Heroes Backend API',
-    version: '1.0.0',
-    documentation: '/docs',
-    endpoints: {
-      health: '/health',
+  const statusCode = dbConnected ? 200 : 500;
+
+  res.status(statusCode).json({
+    status: dbConnected ? 'healthy' : 'unhealthy',
+    timestamp: new Date().toISOString(),
+    services: {
+      database: dbConnected ? 'connected' : 'disconnected',
+      server: 'running',
     },
   });
 });
+
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    message: 'Welcome to Sport Heroes Backend API',
+    version: '1.0.0',
+    documentation: '/api/docs',
+    endpoints: {
+      health: '/health',
+      auth: {
+        login: 'POST /api/v1/auth/login',
+        me: 'GET /api/v1/auth/me',
+        profile: 'PATCH /api/v1/auth/profile',
+        logout: 'POST /api/v1/auth/logout',
+      },
+    },
+  });
+});
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;
