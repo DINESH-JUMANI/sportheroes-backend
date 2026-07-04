@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Logger } from '../../utils/logger';
 import { TableTennisConfig } from '../sports/table-tennis.config';
 import { MatchState, ScoreEvent, processScoreEvent } from '../scoring/scoring-engine';
 
@@ -15,6 +16,7 @@ const eventsStore: Record<string, ScoreEvent[]> = {};
 router.post('/create', (req: Request, res: Response) => {
   const { matchId } = req.body;
   if (!matchId) {
+    Logger.warn('Match create failed: matchId is required');
     return res.status(400).json({ error: 'matchId is required' });
   }
 
@@ -31,6 +33,7 @@ router.post('/create', (req: Request, res: Response) => {
   matchesStore[matchId] = initialMatchState;
   eventsStore[matchId] = [];
 
+  Logger.info('Match created', { matchId });
   return res.status(201).json({
     message: 'Table Tennis match created successfully',
     match: initialMatchState,
@@ -45,10 +48,12 @@ router.post('/start', (req: Request, res: Response) => {
   const { matchId } = req.body;
   const match = matchesStore[matchId];
   if (!match) {
+    Logger.warn('Match start failed: not found', { matchId });
     return res.status(404).json({ error: 'Match not found' });
   }
 
   match.status = 'live';
+  Logger.info('Match started', { matchId });
   return res.json({ message: 'Match is now live', match });
 });
 
@@ -60,10 +65,12 @@ router.post('/event', (req: Request, res: Response) => {
   const { matchId, playerId, eventType } = req.body;
   const match = matchesStore[matchId];
   if (!match) {
+    Logger.warn('Match event failed: not found', { matchId });
     return res.status(404).json({ error: 'Match not found' });
   }
 
   if (!playerId || !eventType) {
+    Logger.warn('Match event failed: missing playerId or eventType', { matchId });
     return res.status(400).json({ error: 'playerId and eventType are required' });
   }
 
@@ -76,17 +83,18 @@ router.post('/event', (req: Request, res: Response) => {
       timestamp: new Date(),
     };
 
-    // Calculate next state using our configurable scoring engine
     const nextState = processScoreEvent(match, event, TableTennisConfig);
     matchesStore[matchId] = nextState;
     eventsStore[matchId].push(event);
 
+    Logger.debug('Score event processed', { matchId, playerId, eventType });
     return res.json({
       message: 'Score event processed',
       event,
       match: nextState,
     });
   } catch (error) {
+    Logger.error('Failed to process score event', error);
     return res.status(400).json({
       error: error instanceof Error ? error.message : 'Failed to process score event',
     });
@@ -101,9 +109,11 @@ router.get('/:matchId', (req: Request, res: Response) => {
   const matchId = req.params.matchId;
   const match = matchesStore[matchId];
   if (!match) {
+    Logger.warn('Match get failed: not found', { matchId });
     return res.status(404).json({ error: 'Match not found' });
   }
 
+  Logger.debug('Match fetched', { matchId });
   return res.json({
     match,
     events: eventsStore[matchId] || [],
