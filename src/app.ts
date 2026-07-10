@@ -7,6 +7,8 @@ import { swaggerSpec } from './config/swagger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestLogger } from './middleware/request-logger.middleware';
 import authRoutes from './modules/auth/auth.routes';
+import sportsRoutes from './modules/sports/sports.routes';
+import playersRoutes from './modules/players/players.routes';
 import matchRouter from './modules/matches/match-router';
 import { Logger } from './utils/logger';
 
@@ -24,6 +26,8 @@ if (config.swagger.enabled) {
 }
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/sports', sportsRoutes);
+app.use('/api/v1/players', playersRoutes);
 app.use('/matches', matchRouter);
 
 app.get('/health', async (_req: Request, res: Response) => {
