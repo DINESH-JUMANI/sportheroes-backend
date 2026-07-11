@@ -6,7 +6,7 @@ import { SaveProfileInput } from './players.validators';
 export class PlayersService {
   async getProfilesByUserId(userId: string) {
     Logger.debug('Fetching sport profiles for user', { userId });
-    
+
     // Check if user exists
     const user = await prisma.user.findUnique({
       where: { id: userId },

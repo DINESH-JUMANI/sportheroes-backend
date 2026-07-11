@@ -63,6 +63,7 @@ app.get('/', (_req: Request, res: Response) => {
       health: '/health',
       auth: {
         login: 'POST /api/v1/auth/login',
+        ...(config.env === 'development' ? { devLogin: 'POST /api/v1/auth/dev-login (dev bypass)' } : {}),
         me: 'GET /api/v1/auth/me',
         profile: 'PATCH /api/v1/auth/profile',
         logout: 'POST /api/v1/auth/logout',

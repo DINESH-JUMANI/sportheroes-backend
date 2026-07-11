@@ -1,10 +1,11 @@
 import type { User } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { getFirebaseAuth } from '../../config/firebase';
+import { config } from '../../config/config';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../../utils/errors';
 import { signAccessToken } from '../../utils/jwt';
 import { Logger } from '../../utils/logger';
-import type { LoginInput, UpdateProfileInput } from './auth.validators';
+import type { LoginInput, UpdateProfileInput, DevLoginInput } from './auth.validators';
 import { LoginResult, PublicUser, toPublicUser } from './auth.types';
 
 function buildTokens(user: User) {
@@ -87,6 +88,62 @@ export class AuthService {
         },
       });
       Logger.info('New user created', { userId: user.id, phoneNumber });
+    }
+
+    return {
+      isNewUser,
+      user: toPublicUser(user),
+      tokens: buildTokens(user),
+    };
+  }
+
+  /**
+   * Developer login bypass for testing. Bypasses Firebase verification
+   * and directly creates or logs in a user and returns an app JWT.
+   * ONLY active when NODE_ENV=development.
+   */
+  async loginDev(input: DevLoginInput): Promise<LoginResult> {
+    if (config.env !== 'development') {
+      Logger.warn('Attempted dev login in non-development environment');
+      throw new UnauthorizedError('Dev login is only available in development environment', 'DEV_LOGIN_DISABLED');
+    }
+
+    const phoneNumber = input.phoneNumber;
+    const email = input.email ?? null;
+    const firebaseUid = input.firebaseUid ?? `dev_uid_${phoneNumber.replace(/\+/g, '')}`;
+
+    Logger.debug('Dev login details', { firebaseUid, phoneNumber, email });
+
+    const existing = await prisma.user.findUnique({ where: { firebaseUid } });
+
+    let user: User;
+    let isNewUser = false;
+
+    if (existing) {
+      if (!existing.isActive) {
+        Logger.warn('Login blocked for deactivated account', { userId: existing.id });
+        throw new UnauthorizedError('Account is deactivated', 'ACCOUNT_DEACTIVATED');
+      }
+
+      user = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          phoneNumber: phoneNumber ?? existing.phoneNumber,
+          email: email ?? existing.email,
+        },
+      });
+      Logger.info('Existing dev user logged in', { userId: user.id });
+    } else {
+      isNewUser = true;
+      user = await prisma.user.create({
+        data: {
+          firebaseUid,
+          phoneNumber,
+          email,
+          fullName: defaultFullName(phoneNumber, firebaseUid),
+        },
+      });
+      Logger.info('New dev user created', { userId: user.id, phoneNumber });
     }
 
     return {

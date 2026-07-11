@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Logger } from '../../utils/logger';
 import { authService } from './auth.service';
-import type { LoginInput, UpdateProfileInput } from './auth.validators';
+import type { LoginInput, UpdateProfileInput, DevLoginInput } from './auth.validators';
 
 export class AuthController {
   async login(req: Request, res: Response): Promise<void> {
@@ -11,6 +11,17 @@ export class AuthController {
     res.status(result.isNewUser ? 201 : 200).json({
       success: true,
       message: result.isNewUser ? 'Account created successfully' : 'Login successful',
+      data: result,
+    });
+  }
+
+  async devLogin(req: Request, res: Response): Promise<void> {
+    Logger.debug('AuthController.devLogin called');
+    const result = await authService.loginDev(req.body as DevLoginInput);
+
+    res.status(result.isNewUser ? 201 : 200).json({
+      success: true,
+      message: result.isNewUser ? 'Dev account created successfully' : 'Dev login successful',
       data: result,
     });
   }
