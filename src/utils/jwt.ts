@@ -16,7 +16,12 @@ export interface SignedToken {
 }
 
 export function signAccessToken(payload: JwtPayload): SignedToken {
-  const expiresInSeconds = config.auth.tokenExpiryDays * 24 * 60 * 60;
+  return signAccessTokenWithDays(payload, config.auth.tokenExpiryDays);
+}
+
+/** Sign a JWT with a custom expiry in days (used for dev tokens). */
+export function signAccessTokenWithDays(payload: JwtPayload, days: number): SignedToken {
+  const expiresInSeconds = days * 24 * 60 * 60;
   const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
   const accessToken = jwt.sign(payload, config.auth.jwtSecret, {
@@ -26,12 +31,12 @@ export function signAccessToken(payload: JwtPayload): SignedToken {
 
   Logger.debug('Access token signed', {
     userId: payload.sub,
-    expiresIn: `${config.auth.tokenExpiryDays}d`,
+    expiresIn: `${days}d`,
   });
 
   return {
     accessToken,
-    expiresIn: `${config.auth.tokenExpiryDays}d`,
+    expiresIn: `${days}d`,
     expiresAt,
   };
 }
