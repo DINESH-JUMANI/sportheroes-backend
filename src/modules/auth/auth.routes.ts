@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import { config } from '../../config/config';
 import { authenticate } from '../../middleware/auth.middleware';
 import { validate } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 import { authController } from './auth.controller';
-import { loginSchema, updateProfileSchema } from './auth.validators';
+import { loginSchema, updateProfileSchema, devLoginSchema } from './auth.validators';
 
 const router = Router();
 
@@ -38,6 +39,50 @@ const router = Router();
  *         description: Invalid Firebase token
  */
 router.post('/login', validate(loginSchema), asyncHandler(authController.login.bind(authController)));
+
+/**
+ * @openapi
+ * /api/v1/auth/dev-login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: (Development Only) Dev Login bypasses Firebase Auth
+ *     description: |
+ *       Directly issues an app JWT for a given phone number. Only available if NODE_ENV=development.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phoneNumber]
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number of the dev user (with country code recommended)
+ *                 example: "+919876543210"
+ *               email:
+ *                 type: string
+ *                 description: Optional email address
+ *                 example: "dev@example.com"
+ *               firebaseUid:
+ *                 type: string
+ *                 description: Optional specific Firebase UID (defaults to auto-generated from phone number if not provided)
+ *                 example: "dev_uid_919876543210"
+ *     responses:
+ *       200:
+ *         description: Dev user successfully logged in
+ *       201:
+ *         description: Dev user successfully registered and logged in
+ *       401:
+ *         description: Dev login disabled in production
+ */
+if (config.env === 'development') {
+  router.post(
+    '/dev-login',
+    validate(devLoginSchema),
+    asyncHandler(authController.devLogin.bind(authController)),
+  );
+}
 
 /**
  * @openapi

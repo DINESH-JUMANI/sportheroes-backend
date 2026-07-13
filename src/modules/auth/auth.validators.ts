@@ -40,5 +40,12 @@ export const updateProfileSchema = z
     message: 'At least one profile field must be provided',
   });
 
+export const devLoginSchema = z.object({
+  phoneNumber: z.string().min(1, 'phoneNumber is required'),
+  email: z.string().trim().email('Invalid email address').optional(),
+  firebaseUid: z.string().optional(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type DevLoginInput = z.infer<typeof devLoginSchema>;
