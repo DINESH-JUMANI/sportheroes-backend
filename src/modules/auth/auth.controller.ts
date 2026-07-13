@@ -44,6 +44,17 @@ export class AuthController {
       message: 'Logged out successfully. Discard the access token on the client.',
     });
   }
+
+  async devLogin(_req: Request, res: Response): Promise<void> {
+    Logger.debug('AuthController.devLogin called');
+    const result = await authService.devLogin();
+
+    res.status(200).json({
+      success: true,
+      message: 'Dev login successful — token valid for 365 days',
+      data: result,
+    });
+  }
 }
 
 export const authController = new AuthController();

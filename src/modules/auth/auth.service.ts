@@ -1,8 +1,14 @@
 import type { User } from '@prisma/client';
+import { config } from '../../config/config';
+import {
+  DEV_TOKEN_EXPIRY_DAYS,
+  DEV_USER_FIREBASE_UID,
+  DEV_USER_ID,
+} from '../../config/dev.constants';
 import { prisma } from '../../config/prisma';
 import { getFirebaseAuth } from '../../config/firebase';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../../utils/errors';
-import { signAccessToken } from '../../utils/jwt';
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
+import { signAccessToken, signAccessTokenWithDays } from '../../utils/jwt';
 import { Logger } from '../../utils/logger';
 import type { LoginInput, UpdateProfileInput } from './auth.validators';
 import { LoginResult, PublicUser, toPublicUser } from './auth.types';
@@ -13,6 +19,24 @@ function buildTokens(user: User) {
     firebaseUid: user.firebaseUid,
     phoneNumber: user.phoneNumber,
   });
+
+  return {
+    accessToken: signed.accessToken,
+    tokenType: 'Bearer' as const,
+    expiresIn: signed.expiresIn,
+    expiresAt: signed.expiresAt.toISOString(),
+  };
+}
+
+function buildDevTokens(user: User) {
+  const signed = signAccessTokenWithDays(
+    {
+      sub: user.id,
+      firebaseUid: user.firebaseUid,
+      phoneNumber: user.phoneNumber,
+    },
+    DEV_TOKEN_EXPIRY_DAYS,
+  );
 
   return {
     accessToken: signed.accessToken,
@@ -150,6 +174,37 @@ export class AuthService {
 
     Logger.info('User profile updated', { userId: user.id });
     return toPublicUser(user);
+  }
+
+  /**
+   * Development-only login for the seeded test user. Issues a 1-year JWT.
+   * Run `npm run db:seed:dev` first.
+   */
+  async devLogin(): Promise<LoginResult> {
+    if (config.env === 'production') {
+      throw new ForbiddenError('Dev login is not available in production', 'DEV_LOGIN_DISABLED');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: DEV_USER_ID } });
+
+    if (!user || user.firebaseUid !== DEV_USER_FIREBASE_UID) {
+      throw new NotFoundError(
+        'Dev test user not found. Run: npm run db:seed:dev',
+        'DEV_USER_NOT_FOUND',
+      );
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedError('Dev account is deactivated', 'ACCOUNT_DEACTIVATED');
+    }
+
+    Logger.info('Dev login issued', { userId: user.id, expiryDays: DEV_TOKEN_EXPIRY_DAYS });
+
+    return {
+      isNewUser: false,
+      user: toPublicUser(user),
+      tokens: buildDevTokens(user),
+    };
   }
 }
 
