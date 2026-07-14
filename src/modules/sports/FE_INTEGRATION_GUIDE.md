@@ -1,9 +1,12 @@
 # Sports Module — Flutter Integration Guide
 
-Base path: `/api/v1/sports`  
-Player profiles: `/api/v1/player-profiles`
+Base path: `/api/v1/sports`
 
-All list/get sport endpoints are **public**. Player profile endpoints require **Bearer token**.
+List/get are **public**. Create / update / delete require **Bearer token**.
+
+Player sport profiles live in a separate module: see `src/modules/players/FE_INTEGRATION_GUIDE.md`.
+
+Run seed if sports are missing: `npm run db:seed:sports`
 
 ---
 
@@ -11,15 +14,13 @@ All list/get sport endpoints are **public**. Player profile endpoints require **
 
 **GET** `/api/v1/sports`
 
-Returns all active sports (Table Tennis, Badminton, Volleyball, Pickleball).
-
 ### Query params
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `page` | number | 1 | Page number |
-| `limit` | number | 20 | Items per page (max 100) |
-| `activeOnly` | string | `true` | `true` or `false` |
+| Param | Type | Default |
+|-------|------|---------|
+| `page` | number | 1 |
+| `limit` | number | 20 |
+| `activeOnly` | string | `true` |
 
 ### Response `200`
 
@@ -43,8 +44,8 @@ Returns all active sports (Table Tennis, Badminton, Volleyball, Pickleball).
           "deuce_enabled": true
         },
         "isActive": true,
-        "createdAt": "2026-07-04T00:00:00.000Z",
-        "updatedAt": "2026-07-04T00:00:00.000Z"
+        "createdAt": "...",
+        "updatedAt": "..."
       }
     ],
     "meta": { "page": 1, "limit": 20, "total": 4, "totalPages": 1 }
@@ -63,9 +64,7 @@ Returns all active sports (Table Tennis, Badminton, Volleyball, Pickleball).
 ```json
 {
   "success": true,
-  "data": {
-    "sport": { "...same fields as list item..." }
-  }
+  "data": { "sport": { "...same fields..." } }
 }
 ```
 
@@ -77,98 +76,70 @@ Returns all active sports (Table Tennis, Badminton, Volleyball, Pickleball).
 
 Example: `/api/v1/sports/code/TT`
 
-### Response `200`
-
-Same shape as get by ID.
-
 ---
 
-## 4. Create Player Sport Profile
+## 4. Create Sport
 
-**POST** `/api/v1/player-profiles`  
+**POST** `/api/v1/sports`  
 **Auth:** Bearer required
 
-Call after login when user selects which sports they play.
+Use this to add future sports (Tennis, Squash, etc.) without a code deploy.
 
 ### Request body
 
 ```json
 {
-  "sportId": "uuid-of-sport",
-  "skillLevel": "beginner",
-  "isPrimarySport": true
+  "name": "Tennis",
+  "code": "TEN",
+  "isTeamSport": false,
+  "description": "Racket sport played on a court",
+  "defaultMatchFormat": {
+    "sets_to_win": 2,
+    "best_of_sets": 3,
+    "points_per_set": 6,
+    "win_by_margin": 2,
+    "deuce_enabled": true
+  }
 }
 ```
 
-| Field | Type | Required | Values |
-|-------|------|----------|--------|
-| `sportId` | string (uuid) | yes | Sport ID from list sports |
-| `skillLevel` | string | no | `beginner`, `intermediate`, `advanced`, `professional` |
-| `isPrimarySport` | boolean | no | Default `false`. Only one primary sport per user |
+| Field | Required |
+|-------|----------|
+| `name` | yes |
+| `code` | yes (unique, uppercased) |
+| `defaultMatchFormat` | yes |
+| `iconUrl`, `description`, `isTeamSport`, `isActive` | no |
 
 ### Response `201`
 
 ```json
 {
   "success": true,
-  "message": "Sport profile created",
-  "data": {
-    "profile": {
-      "id": "uuid",
-      "userId": "uuid",
-      "sportId": "uuid",
-      "skillLevel": "beginner",
-      "rankingPoints": 0,
-      "isPrimarySport": true,
-      "sport": { "...sport object..." },
-      "createdAt": "...",
-      "updatedAt": "..."
-    }
-  }
+  "message": "Sport created",
+  "data": { "sport": { "...sport object..." } }
 }
 ```
 
 ---
 
-## 5. Get My Sport Profiles
+## 5. Update Sport
 
-**GET** `/api/v1/player-profiles/me`  
-**Auth:** Bearer required
-
-### Response `200`
-
-```json
-{
-  "success": true,
-  "data": {
-    "profiles": [ { "...profile object..." } ]
-  }
-}
-```
-
----
-
-## 6. Get User Sport Profiles (public)
-
-**GET** `/api/v1/player-profiles/user/:userId`
-
-### Response `200`
-
-Same as my profiles.
-
----
-
-## 7. Update Player Sport Profile
-
-**PATCH** `/api/v1/player-profiles/:id`  
+**PATCH** `/api/v1/sports/:id`  
 **Auth:** Bearer required
 
 ### Request body (at least one field)
 
 ```json
 {
-  "skillLevel": "intermediate",
-  "isPrimarySport": false
+  "description": "Updated description",
+  "defaultMatchFormat": {
+    "sets_to_win": 2,
+    "best_of_sets": 3,
+    "points_per_set": 11,
+    "win_by_margin": 2,
+    "deuce_enabled": true
+  },
+  "isActive": true
 }
 ```
 
@@ -177,31 +148,41 @@ Same as my profiles.
 ```json
 {
   "success": true,
-  "message": "Sport profile updated",
-  "data": { "profile": { "...profile object..." } }
+  "message": "Sport updated",
+  "data": { "sport": { "...updated..." } }
 }
 ```
 
 ---
 
-## 8. Delete Player Sport Profile
+## 6. Delete Sport (soft delete)
 
-**DELETE** `/api/v1/player-profiles/:id`  
+**DELETE** `/api/v1/sports/:id`  
 **Auth:** Bearer required
 
+Sets `isActive: false` so historical matches/teams keep valid FKs.
+
 ### Response `200`
 
 ```json
 {
   "success": true,
-  "message": "Sport profile deleted"
+  "message": "Sport deactivated",
+  "data": { "sport": { "...isActive: false..." } }
 }
 ```
 
 ---
 
-## Flutter flow
+## Seeded MVP sports
 
-1. After login → `GET /api/v1/sports` → show sport picker
-2. User selects sports → `POST /api/v1/player-profiles` for each
-3. Home screen → `GET /api/v1/player-profiles/me` to show user's sports
+| Name | Code | Team sport |
+|------|------|------------|
+| Table Tennis | TT | no |
+| Badminton | BAD | no |
+| Volleyball | VB | yes |
+| Pickleball | PBL | no |
+
+```bash
+npm run db:seed:sports
+```

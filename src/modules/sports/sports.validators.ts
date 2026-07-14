@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { paginationSchema } from '../../utils/pagination';
 
+export const matchFormatSchema = z.object({
+  sets_to_win: z.number().int().min(1),
+  best_of_sets: z.number().int().min(1),
+  points_per_set: z.number().int().min(1),
+  win_by_margin: z.number().int().min(1),
+  deuce_enabled: z.boolean().optional(),
+  deciding_set_points: z.number().int().min(1).optional(),
+});
+
 export const listSportsQuerySchema = paginationSchema.extend({
   activeOnly: z
     .enum(['true', 'false'])
@@ -12,26 +21,40 @@ export const sportCodeParamSchema = z.object({
   code: z.string().min(1).max(10),
 });
 
-export const createPlayerProfileSchema = z.object({
-  sportId: z.string().uuid('Invalid sportId'),
-  skillLevel: z
-    .enum(['beginner', 'intermediate', 'advanced', 'professional'])
-    .default('beginner'),
-  isPrimarySport: z.boolean().optional().default(false),
+export const createSportSchema = z.object({
+  name: z.string().trim().min(2).max(50),
+  code: z
+    .string()
+    .trim()
+    .min(2)
+    .max(10)
+    .transform((v) => v.toUpperCase()),
+  iconUrl: z.string().url().nullable().optional(),
+  description: z.string().max(1000).nullable().optional(),
+  isTeamSport: z.boolean().optional().default(false),
+  defaultMatchFormat: matchFormatSchema,
+  isActive: z.boolean().optional().default(true),
 });
 
-export const updatePlayerProfileSchema = z
+export const updateSportSchema = z
   .object({
-    skillLevel: z.enum(['beginner', 'intermediate', 'advanced', 'professional']).optional(),
-    isPrimarySport: z.boolean().optional(),
+    name: z.string().trim().min(2).max(50).optional(),
+    code: z
+      .string()
+      .trim()
+      .min(2)
+      .max(10)
+      .transform((v) => v.toUpperCase())
+      .optional(),
+    iconUrl: z.string().url().nullable().optional(),
+    description: z.string().max(1000).nullable().optional(),
+    isTeamSport: z.boolean().optional(),
+    defaultMatchFormat: matchFormatSchema.optional(),
+    isActive: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
   });
 
-export const userIdParamSchema = z.object({
-  userId: z.string().uuid('Invalid userId'),
-});
-
-export type CreatePlayerProfileInput = z.infer<typeof createPlayerProfileSchema>;
-export type UpdatePlayerProfileInput = z.infer<typeof updatePlayerProfileSchema>;
+export type CreateSportInput = z.infer<typeof createSportSchema>;
+export type UpdateSportInput = z.infer<typeof updateSportSchema>;

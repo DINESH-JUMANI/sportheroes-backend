@@ -17,10 +17,11 @@ const DEV_TOKEN_DAYS = 365;
 async function main() {
   console.log('\n=== SportHeroes Dev Seed ===\n');
 
-  // Run SQL migration
+  // Run SQL migrations for both dev users
+  const root = path.join(__dirname, '..');
   const migrationScript = path.join(__dirname, 'run-migration.js');
-  execSync(`node "${migrationScript}" 7.seed_dev_user.sql`, { stdio: 'pipe', cwd: root });
-  execSync(`node "${migrationScript}" 8.seed_dev_user_2.sql`, { stdio: 'pipe', cwd: root });
+  execSync(`node "${migrationScript}" 7.seed_dev_user.sql`, { stdio: 'inherit', cwd: root });
+  execSync(`node "${migrationScript}" 8.seed_dev_user_2.sql`, { stdio: 'inherit', cwd: root });
 
   const jwtSecret = process.env.JWT_SECRET;
   const jwtIssuer = process.env.JWT_ISSUER || 'sportheroes-api';

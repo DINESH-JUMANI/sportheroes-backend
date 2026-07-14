@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
  * E2E: Sports module
- * Tests: list sports, get by code/id, player sport profiles CRUD
- * Seeds: player sport profiles for dev user (Table Tennis + Badminton)
+ * Tests: list, get by code/id, create, update, soft-delete
+ * Ensures MVP sports exist via seed
  *
  * Usage: npm run e2e:sports
  */
 
+const { execSync } = require('child_process');
+const path = require('path');
 const {
   assert,
   checkServer,
@@ -35,13 +37,20 @@ async function run() {
 
   if (!(await checkServer())) process.exit(1);
 
+  logStep('Seed MVP sports (production-safe)');
+  execSync('node scripts/run-migration.js 9.seed_sports.sql', {
+    stdio: 'inherit',
+    cwd: path.join(__dirname, '..', '..'),
+  });
+  assert(true, 'Sports seed applied');
+
   const token = await getToken();
 
   logStep('GET /api/v1/sports');
   const list = await apiExpect('GET', '/api/v1/sports', { query: { page: 1, limit: 20 } }, 200);
   assert(list.ok, 'List sports returns 200');
   const sports = list.data?.data?.sports || [];
-  assert(sports.length >= 4, 'At least 4 MVP sports seeded', `got ${sports.length}`);
+  assert(sports.length >= 4, 'At least 4 MVP sports present', `got ${sports.length}`);
 
   const tableTennis = sports.find((s) => s.code === 'TT');
   const badminton = sports.find((s) => s.code === 'BAD');
@@ -58,64 +67,60 @@ async function run() {
   const byId = await apiExpect('GET', `/api/v1/sports/${tableTennis.id}`, {}, 200);
   assert(byId.ok, 'Get sport by ID returns 200');
 
+  logStep('POST /api/v1/sports (create)');
+  const create = await apiExpect('POST', '/api/v1/sports', {
+    token,
+    body: {
+      name: 'Squash',
+      code: 'SQ',
+      isTeamSport: false,
+      description: 'Racket sport played in a four-walled court',
+      defaultMatchFormat: {
+        sets_to_win: 3,
+        best_of_sets: 5,
+        points_per_set: 11,
+        win_by_margin: 2,
+        deuce_enabled: true,
+      },
+    },
+  }, [201, 409]);
+  assert(create.ok, 'Create sport returns 201 or already exists');
+
+  let squashId = create.data?.data?.sport?.id;
+  if (create.status === 409) {
+    const existing = await apiExpect('GET', '/api/v1/sports/code/SQ', {}, 200);
+    squashId = existing.data?.data?.sport?.id;
+  }
+  assert(!!squashId, 'Squash sport id available');
+  mergeState({ sportIdSQ: squashId });
+
+  logStep('PATCH /api/v1/sports/:id');
+  const updated = await apiExpect('PATCH', `/api/v1/sports/${squashId}`, {
+    token,
+    body: { description: 'Indoor racket sport with a hollow rubber ball' },
+  }, 200);
+  assert(updated.ok, 'Update sport returns 200');
+
+  logStep('DELETE /api/v1/sports/:id (soft delete)');
+  const removed = await apiExpect('DELETE', `/api/v1/sports/${squashId}`, { token }, 200);
+  assert(removed.ok, 'Soft-delete sport returns 200');
+  assert(removed.data?.data?.sport?.isActive === false, 'Sport is deactivated');
+
+  // Reactivate for cleanliness of future runs (optional)
+  await apiExpect('PATCH', `/api/v1/sports/${squashId}`, {
+    token,
+    body: { isActive: true },
+  }, 200);
+
   logStep('GET /api/v1/sports/invalid (expect 400)');
   const badId = await apiExpect('GET', '/api/v1/sports/not-a-uuid', {}, 400);
   assert(badId.ok, 'Invalid UUID returns 400');
 
-  logStep('POST /api/v1/player-profiles (Table Tennis)');
-  let createTT = await apiExpect('POST', '/api/v1/player-profiles', {
-    token,
-    body: { sportId: tableTennis.id, skillLevel: 'intermediate', isPrimarySport: true },
-  }, [200, 201, 409]);
-
-  if (createTT.status === 409) {
-    logStep('Profile exists — fetch existing profiles');
-    const existing = await apiExpect('GET', '/api/v1/player-profiles/me', { token }, 200);
-    const profiles = existing.data?.data?.profiles || [];
-    const ttProfile = profiles.find((p) => p.sportId === tableTennis.id);
-    createTT = { data: { data: { profile: ttProfile } }, status: 200, ok: true };
-  }
-  assert(createTT.ok, 'Create TT player profile');
-  const profileTTId = createTT.data?.data?.profile?.id;
-  assert(!!profileTTId, 'TT profile has id');
-  mergeState({ profileTTId });
-
-  logStep('POST /api/v1/player-profiles (Badminton)');
-  let createBAD = await apiExpect('POST', '/api/v1/player-profiles', {
-    token,
-    body: { sportId: badminton.id, skillLevel: 'beginner', isPrimarySport: false },
-  }, [200, 201, 409]);
-  if (createBAD.status === 409) {
-    const existing = await apiExpect('GET', '/api/v1/player-profiles/me', { token }, 200);
-    const profiles = existing.data?.data?.profiles || [];
-    const badProfile = profiles.find((p) => p.sportId === badminton.id);
-    createBAD = { data: { data: { profile: badProfile } }, status: 200, ok: true };
-  }
-  assert(createBAD.ok, 'Create Badminton player profile');
-  mergeState({ profileBADId: createBAD.data?.data?.profile?.id });
-
-  logStep('GET /api/v1/player-profiles/me');
-  const myProfiles = await apiExpect('GET', '/api/v1/player-profiles/me', { token }, 200);
-  assert(myProfiles.ok, 'Get my profiles returns 200');
-  assert((myProfiles.data?.data?.profiles?.length || 0) >= 1, 'User has at least 1 sport profile');
-
-  logStep('GET /api/v1/player-profiles/user/:userId');
-  const state = loadState();
-  const userProfiles = await apiExpect(
-    'GET',
-    `/api/v1/player-profiles/user/${state.userId || 'a0000000-0000-4000-8000-000000000001'}`,
-    { token },
-    200,
-  );
-  assert(userProfiles.ok, 'Get user profiles returns 200');
-
-  logStep('PATCH /api/v1/player-profiles/:id');
-  const updated = await apiExpect('PATCH', `/api/v1/player-profiles/${profileTTId}`, {
-    token,
-    body: { skillLevel: 'advanced' },
-  }, 200);
-  assert(updated.ok, 'Update profile returns 200');
-  assert(updated.data?.data?.profile?.skillLevel === 'advanced', 'Skill level updated');
+  logStep('POST /api/v1/sports without auth (expect 401)');
+  const noAuth = await apiExpect('POST', '/api/v1/sports', {
+    body: { name: 'X', code: 'XX', defaultMatchFormat: { sets_to_win: 1, best_of_sets: 1, points_per_set: 1, win_by_margin: 1 } },
+  }, 401);
+  assert(noAuth.ok, 'Create without token returns 401');
 
   printSummary(MODULE);
 }

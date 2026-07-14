@@ -22,41 +22,31 @@ export class SportsController {
     res.status(200).json({ success: true, data: { sport } });
   }
 
-  async createProfile(req: Request, res: Response): Promise<void> {
-    const profile = await sportsService.createPlayerProfile(req.user!.id, req.body);
+  async create(req: Request, res: Response): Promise<void> {
+    const sport = await sportsService.createSport(req.body);
     res.status(201).json({
       success: true,
-      message: 'Sport profile created',
-      data: { profile },
+      message: 'Sport created',
+      data: { sport },
     });
   }
 
-  async myProfiles(req: Request, res: Response): Promise<void> {
-    const profiles = await sportsService.getMyProfiles(req.user!.id);
-    res.status(200).json({ success: true, data: { profiles } });
-  }
-
-  async userProfiles(req: Request, res: Response): Promise<void> {
-    const profiles = await sportsService.getUserProfiles(req.params.userId);
-    res.status(200).json({ success: true, data: { profiles } });
-  }
-
-  async updateProfile(req: Request, res: Response): Promise<void> {
-    const profile = await sportsService.updatePlayerProfile(
-      req.user!.id,
-      req.params.id,
-      req.body,
-    );
+  async update(req: Request, res: Response): Promise<void> {
+    const sport = await sportsService.updateSport(req.params.id, req.body);
     res.status(200).json({
       success: true,
-      message: 'Sport profile updated',
-      data: { profile },
+      message: 'Sport updated',
+      data: { sport },
     });
   }
 
-  async deleteProfile(req: Request, res: Response): Promise<void> {
-    await sportsService.deletePlayerProfile(req.user!.id, req.params.id);
-    res.status(200).json({ success: true, message: 'Sport profile deleted' });
+  async remove(req: Request, res: Response): Promise<void> {
+    const sport = await sportsService.deleteSport(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: 'Sport deactivated',
+      data: { sport },
+    });
   }
 }
 

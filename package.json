@@ -18,15 +18,18 @@
     "db:migrate:6": "node scripts/run-migration.js 6.add_statistics.sql",
     "db:migrate:7": "node scripts/run-migration.js 7.seed_dev_user.sql",
     "db:migrate:8": "node scripts/run-migration.js 8.seed_dev_user_2.sql",
+    "db:migrate:9": "node scripts/run-migration.js 9.seed_sports.sql",
     "db:seed:dev": "node scripts/seed-dev-token.js",
+    "db:seed:sports": "node scripts/run-migration.js 9.seed_sports.sql",
     "e2e:auth": "node scripts/e2e/01-auth.e2e.js",
     "e2e:sports": "node scripts/e2e/02-sports.e2e.js",
+    "e2e:players": "node scripts/e2e/02b-players.e2e.js",
     "e2e:teams": "node scripts/e2e/03-teams.e2e.js",
     "e2e:tournaments": "node scripts/e2e/04-tournaments.e2e.js",
     "e2e:matches": "node scripts/e2e/05-matches.e2e.js",
     "e2e:statistics": "node scripts/e2e/06-statistics.e2e.js",
     "e2e:all": "node scripts/e2e/run-all.e2e.js",
-    "db:migrate:all": "node scripts/run-migration.js 1.add_user.sql && node scripts/run-migration.js 2.add_sports_and_player_profiles.sql && node scripts/run-migration.js 3.add_teams.sql && node scripts/run-migration.js 4.add_tournaments.sql && node scripts/run-migration.js 5.add_matches.sql && node scripts/run-migration.js 6.add_statistics.sql"
+    "db:migrate:all": "node scripts/run-migration.js 1.add_user.sql && node scripts/run-migration.js 2.add_sports_and_player_profiles.sql && node scripts/run-migration.js 3.add_teams.sql && node scripts/run-migration.js 4.add_tournaments.sql && node scripts/run-migration.js 5.add_matches.sql && node scripts/run-migration.js 6.add_statistics.sql && node scripts/run-migration.js 9.seed_sports.sql"
   },
   "keywords": [
     "express",

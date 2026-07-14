@@ -2,8 +2,8 @@ import { prisma } from '../../config/prisma';
 import { ConflictError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
 import { buildPaginationMeta, getPagination } from '../../utils/pagination';
-import type { CreatePlayerProfileInput, UpdatePlayerProfileInput } from './sports.validators';
-import { toPublicPlayerSportProfile, toPublicSport } from './sports.types';
+import type { CreateSportInput, UpdateSportInput } from './sports.validators';
+import { toPublicSport } from './sports.types';
 
 export class SportsService {
   async listSports(page: number, limit: number, activeOnly = true) {
@@ -23,99 +23,96 @@ export class SportsService {
 
   async getSportById(id: string) {
     const sport = await prisma.sport.findUnique({ where: { id } });
-    if (!sport || !sport.isActive) throw new NotFoundError('Sport not found');
+    if (!sport) throw new NotFoundError('Sport not found');
     return toPublicSport(sport);
   }
 
   async getSportByCode(code: string) {
     const sport = await prisma.sport.findUnique({ where: { code: code.toUpperCase() } });
-    if (!sport || !sport.isActive) throw new NotFoundError('Sport not found');
+    if (!sport) throw new NotFoundError('Sport not found');
     return toPublicSport(sport);
   }
 
-  async createPlayerProfile(userId: string, input: CreatePlayerProfileInput) {
-    const sport = await prisma.sport.findUnique({ where: { id: input.sportId } });
-    if (!sport || !sport.isActive) throw new NotFoundError('Sport not found');
-
-    const existing = await prisma.playerSportProfile.findUnique({
-      where: { userId_sportId: { userId, sportId: input.sportId } },
-    });
-    if (existing) throw new ConflictError('Player already has a profile for this sport');
-
-    if (input.isPrimarySport) {
-      await prisma.playerSportProfile.updateMany({
-        where: { userId, isPrimarySport: true },
-        data: { isPrimarySport: false },
-      });
-    }
-
-    const profile = await prisma.playerSportProfile.create({
-      data: {
-        userId,
-        sportId: input.sportId,
-        skillLevel: input.skillLevel,
-        isPrimarySport: input.isPrimarySport ?? false,
+  async createSport(input: CreateSportInput) {
+    const existing = await prisma.sport.findFirst({
+      where: {
+        OR: [{ code: input.code }, { name: input.name }],
       },
-      include: { sport: true },
     });
-
-    Logger.info('Player sport profile created', { userId, sportId: input.sportId });
-    return toPublicPlayerSportProfile(profile);
-  }
-
-  async getMyProfiles(userId: string) {
-    const profiles = await prisma.playerSportProfile.findMany({
-      where: { userId },
-      include: { sport: true },
-      orderBy: [{ isPrimarySport: 'desc' }, { createdAt: 'asc' }],
-    });
-    return profiles.map(toPublicPlayerSportProfile);
-  }
-
-  async getUserProfiles(userId: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.isActive) throw new NotFoundError('User not found');
-
-    const profiles = await prisma.playerSportProfile.findMany({
-      where: { userId },
-      include: { sport: true },
-      orderBy: [{ isPrimarySport: 'desc' }, { createdAt: 'asc' }],
-    });
-    return profiles.map(toPublicPlayerSportProfile);
-  }
-
-  async updatePlayerProfile(userId: string, profileId: string, input: UpdatePlayerProfileInput) {
-    const profile = await prisma.playerSportProfile.findFirst({
-      where: { id: profileId, userId },
-      include: { sport: true },
-    });
-    if (!profile) throw new NotFoundError('Player sport profile not found');
-
-    if (input.isPrimarySport) {
-      await prisma.playerSportProfile.updateMany({
-        where: { userId, isPrimarySport: true, NOT: { id: profileId } },
-        data: { isPrimarySport: false },
-      });
+    if (existing) {
+      throw new ConflictError(
+        existing.code === input.code
+          ? `Sport with code ${input.code} already exists`
+          : `Sport with name ${input.name} already exists`,
+      );
     }
 
-    const updated = await prisma.playerSportProfile.update({
-      where: { id: profileId },
-      data: input,
-      include: { sport: true },
+    const sport = await prisma.sport.create({
+      data: {
+        name: input.name,
+        code: input.code,
+        iconUrl: input.iconUrl ?? null,
+        description: input.description ?? null,
+        isTeamSport: input.isTeamSport ?? false,
+        defaultMatchFormat: input.defaultMatchFormat,
+        isActive: input.isActive ?? true,
+      },
     });
 
-    Logger.info('Player sport profile updated', { profileId, userId });
-    return toPublicPlayerSportProfile(updated);
+    Logger.info('Sport created', { sportId: sport.id, code: sport.code });
+    return toPublicSport(sport);
   }
 
-  async deletePlayerProfile(userId: string, profileId: string) {
-    const profile = await prisma.playerSportProfile.findFirst({
-      where: { id: profileId, userId },
-    });
-    if (!profile) throw new NotFoundError('Player sport profile not found');
+  async updateSport(id: string, input: UpdateSportInput) {
+    const existing = await prisma.sport.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError('Sport not found');
 
-    await prisma.playerSportProfile.delete({ where: { id: profileId } });
-    Logger.info('Player sport profile deleted', { profileId, userId });
+    if (input.code || input.name) {
+      const clash = await prisma.sport.findFirst({
+        where: {
+          NOT: { id },
+          OR: [
+            ...(input.code ? [{ code: input.code }] : []),
+            ...(input.name ? [{ name: input.name }] : []),
+          ],
+        },
+      });
+      if (clash) {
+        throw new ConflictError('Another sport already uses this name or code');
+      }
+    }
+
+    const sport = await prisma.sport.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.code !== undefined ? { code: input.code } : {}),
+        ...(input.iconUrl !== undefined ? { iconUrl: input.iconUrl } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.isTeamSport !== undefined ? { isTeamSport: input.isTeamSport } : {}),
+        ...(input.defaultMatchFormat !== undefined
+          ? { defaultMatchFormat: input.defaultMatchFormat }
+          : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      },
+    });
+
+    Logger.info('Sport updated', { sportId: id });
+    return toPublicSport(sport);
+  }
+
+  async deleteSport(id: string) {
+    const existing = await prisma.sport.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError('Sport not found');
+
+    // Soft-delete so historical matches/teams keep their FK
+    const sport = await prisma.sport.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    Logger.info('Sport deactivated', { sportId: id });
+    return toPublicSport(sport);
   }
 }
 

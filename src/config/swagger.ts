@@ -40,7 +40,8 @@ SportHeroes backend REST API.
     },
     tags: [
       { name: 'Auth', description: 'Authentication (Firebase + dev login)' },
-      { name: 'Sports', description: 'Sports master data and player sport profiles' },
+      { name: 'Sports', description: 'Sports master data (CRUD)' },
+      { name: 'Players', description: 'Player sport profiles' },
       { name: 'Teams', description: 'Team management' },
       { name: 'Tournaments', description: 'Tournament management' },
       { name: 'Matches', description: 'Match lifecycle and live scoring' },
@@ -51,6 +52,7 @@ SportHeroes backend REST API.
     './src/docs/swagger.components.ts',
     './src/docs/swagger.auth.paths.ts',
     './src/docs/swagger.sports.paths.ts',
+    './src/docs/swagger.players.paths.ts',
     './src/docs/swagger.teams.paths.ts',
     './src/docs/swagger.tournaments.paths.ts',
     './src/docs/swagger.matches.paths.ts',

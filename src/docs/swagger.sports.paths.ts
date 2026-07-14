@@ -32,6 +32,57 @@
  *                     meta: { $ref: '#/components/schemas/PaginationMeta' }
  *       400:
  *         $ref: '#/components/responses/BadRequest'
+ *   post:
+ *     tags: [Sports]
+ *     summary: Create a sport
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, code, defaultMatchFormat]
+ *             properties:
+ *               name: { type: string, example: Tennis }
+ *               code: { type: string, example: TEN }
+ *               iconUrl: { type: string, format: uri, nullable: true }
+ *               description: { type: string, nullable: true }
+ *               isTeamSport: { type: boolean, default: false }
+ *               isActive: { type: boolean, default: true }
+ *               defaultMatchFormat:
+ *                 $ref: '#/components/schemas/MatchFormat'
+ *           example:
+ *             name: Tennis
+ *             code: TEN
+ *             isTeamSport: false
+ *             description: Racket sport played on a court
+ *             defaultMatchFormat:
+ *               sets_to_win: 2
+ *               best_of_sets: 3
+ *               points_per_set: 6
+ *               win_by_margin: 2
+ *               deuce_enabled: true
+ *     responses:
+ *       201:
+ *         description: Sport created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 message: { type: string }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sport: { $ref: '#/components/schemas/Sport' }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
  *
  * /api/v1/sports/code/{code}:
  *   get:
@@ -84,26 +135,33 @@
  *         $ref: '#/components/responses/BadRequest'
  *       404:
  *         $ref: '#/components/responses/NotFound'
- *
- * /api/v1/player-profiles:
- *   post:
+ *   patch:
  *     tags: [Sports]
- *     summary: Create player sport profile
+ *     summary: Update a sport
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [sportId]
  *             properties:
- *               sportId: { type: string, format: uuid }
- *               skillLevel: { type: string, enum: [beginner, intermediate, advanced, professional], default: beginner }
- *               isPrimarySport: { type: boolean, default: false }
+ *               name: { type: string }
+ *               code: { type: string }
+ *               iconUrl: { type: string, nullable: true }
+ *               description: { type: string, nullable: true }
+ *               isTeamSport: { type: boolean }
+ *               isActive: { type: boolean }
+ *               defaultMatchFormat:
+ *                 $ref: '#/components/schemas/MatchFormat'
  *     responses:
- *       201:
- *         description: Profile created
+ *       200:
+ *         description: Sport updated
  *         content:
  *           application/json:
  *             schema:
@@ -114,7 +172,7 @@
  *                 data:
  *                   type: object
  *                   properties:
- *                     profile: { $ref: '#/components/schemas/PlayerSportProfile' }
+ *                     sport: { $ref: '#/components/schemas/Sport' }
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -123,75 +181,9 @@
  *         $ref: '#/components/responses/NotFound'
  *       409:
  *         $ref: '#/components/responses/Conflict'
- *
- * /api/v1/player-profiles/me:
- *   get:
- *     tags: [Sports]
- *     summary: Get my sport profiles
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200:
- *         description: List of profiles
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: object
- *                   properties:
- *                     profiles:
- *                       type: array
- *                       items: { $ref: '#/components/schemas/PlayerSportProfile' }
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *
- * /api/v1/player-profiles/user/{userId}:
- *   get:
- *     tags: [Sports]
- *     summary: Get sport profiles for a user
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: User profiles
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *
- * /api/v1/player-profiles/{id}:
- *   patch:
- *     tags: [Sports]
- *     summary: Update player sport profile
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               skillLevel: { type: string, enum: [beginner, intermediate, advanced, professional] }
- *               isPrimarySport: { type: boolean }
- *     responses:
- *       200:
- *         description: Updated
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
  *   delete:
  *     tags: [Sports]
- *     summary: Delete player sport profile
+ *     summary: Soft-delete a sport (sets isActive=false)
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
@@ -200,7 +192,7 @@
  *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
- *         description: Deleted
+ *         description: Sport deactivated
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       404:

@@ -14,6 +14,7 @@ const { execSync } = require('child_process');
 const SCRIPTS = [
   '01-auth.e2e.js',
   '02-sports.e2e.js',
+  '02b-players.e2e.js',
   '03-teams.e2e.js',
   '04-tournaments.e2e.js',
   '05-matches.e2e.js',
