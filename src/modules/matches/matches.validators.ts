@@ -5,11 +5,20 @@ const participantSchema = z
   .object({
     side: z.enum(['A', 'B']),
     userId: z.string().uuid().optional(),
+    phoneNumber: z.string().optional(),
     teamId: z.string().uuid().optional(),
+    teamName: z.string().optional(),
   })
-  .refine((d) => Boolean(d.userId) !== Boolean(d.teamId), {
-    message: 'Each participant must have exactly one of userId or teamId',
-  });
+  .refine(
+    (d) => {
+      const hasUser = Boolean(d.userId) || Boolean(d.phoneNumber);
+      const hasTeam = Boolean(d.teamId) || Boolean(d.teamName);
+      return hasUser !== hasTeam;
+    },
+    {
+      message: 'Each participant must have exactly one of user (userId or phoneNumber) or team (teamId or teamName)',
+    }
+  );
 
 export const listMatchesQuerySchema = paginationSchema.extend({
   sportId: z.string().uuid().optional(),

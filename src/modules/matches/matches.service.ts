@@ -1,4 +1,4 @@
-import { MatchStatusType, Prisma, PointType } from '@prisma/client';
+import { MatchStatusType, Prisma, PointType, MatchSideType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
@@ -25,6 +25,43 @@ export class MatchesService {
       }
     }
 
+    // Resolve participants' phone numbers / team names to IDs
+    const participantsData: { side: MatchSideType; userId: string | null; teamId: string | null }[] = [];
+    for (const p of input.participants) {
+      let resolvedUserId: string | null = null;
+      let resolvedTeamId: string | null = null;
+
+      if (p.userId) {
+        resolvedUserId = p.userId;
+      } else if (p.phoneNumber) {
+        const user = await prisma.user.findFirst({
+          where: { phoneNumber: p.phoneNumber, isActive: true },
+        });
+        if (!user) {
+          throw new NotFoundError(`Player with phone number ${p.phoneNumber} not found`);
+        }
+        resolvedUserId = user.id;
+      }
+
+      if (p.teamId) {
+        resolvedTeamId = p.teamId;
+      } else if (p.teamName) {
+        const team = await prisma.team.findFirst({
+          where: { name: p.teamName, sportId: input.sportId, isActive: true },
+        });
+        if (!team) {
+          throw new NotFoundError(`Team with name "${p.teamName}" not found for this sport`);
+        }
+        resolvedTeamId = team.id;
+      }
+
+      participantsData.push({
+        side: p.side,
+        userId: resolvedUserId,
+        teamId: resolvedTeamId,
+      });
+    }
+
     const match = await prisma.$transaction(async (tx) => {
       const created = await tx.match.create({
         data: {
@@ -37,16 +74,19 @@ export class MatchesService {
           scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
           createdBy: userId,
           participants: {
-            create: input.participants.map((p) => ({
-              side: p.side,
-              userId: p.userId ?? null,
-              teamId: p.teamId ?? null,
-            })),
+            create: participantsData,
           },
           sets: { create: { setNumber: 1 } },
         },
         include: {
-          participants: { include: { user: true, team: true } },
+          participants: {
+            include: {
+              user: true,
+              team: {
+                include: { captain: true },
+              },
+            },
+          },
           sets: true,
         },
       });
@@ -79,7 +119,14 @@ export class MatchesService {
         take,
         orderBy: { createdAt: 'desc' },
         include: {
-          participants: { include: { user: true, team: true } },
+          participants: {
+            include: {
+              user: true,
+              team: {
+                include: { captain: true },
+              },
+            },
+          },
           sets: { orderBy: { setNumber: 'asc' } },
         },
       }),
@@ -96,7 +143,14 @@ export class MatchesService {
     const match = await prisma.match.findUnique({
       where: { id },
       include: {
-        participants: { include: { user: true, team: true } },
+        participants: {
+          include: {
+            user: true,
+            team: {
+              include: { captain: true },
+            },
+          },
+        },
         sets: { orderBy: { setNumber: 'asc' } },
         points: {
           where: { isUndone: false },
@@ -152,7 +206,14 @@ export class MatchesService {
         where: { id: matchId },
         data,
         include: {
-          participants: { include: { user: true, team: true } },
+          participants: {
+            include: {
+              user: true,
+              team: {
+                include: { captain: true },
+              },
+            },
+          },
           sets: { orderBy: { setNumber: 'asc' } },
           points: {
             where: { isUndone: false },

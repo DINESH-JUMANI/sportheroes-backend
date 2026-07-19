@@ -42,8 +42,8 @@ async function run() {
       matchType: 'singles',
       venue: 'TT Center',
       participants: [
-        { side: 'A', userId: DEV_USER_1.id },
-        { side: 'B', userId: DEV_USER_2.id },
+        { side: 'A', phoneNumber: DEV_USER_1.phone },
+        { side: 'B', phoneNumber: DEV_USER_2.phone },
       ],
     },
   }, 201);

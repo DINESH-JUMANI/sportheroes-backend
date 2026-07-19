@@ -87,8 +87,8 @@ async function run() {
       matchType: 'singles',
       venue: 'E2E Court 1',
       participants: [
-        { side: 'A', userId: DEV_USER_1.id },
-        { side: 'B', userId: DEV_USER_2.id },
+        { side: 'A', phoneNumber: DEV_USER_1.phone },
+        { side: 'B', phoneNumber: DEV_USER_2.phone },
       ],
     },
   }, 201);
@@ -153,14 +153,55 @@ async function run() {
         tournamentId: state.tournamentId,
         tournamentRoundId: state.tournamentRoundId,
         participants: [
-          { side: 'A', userId: DEV_USER_1.id },
-          { side: 'B', userId: DEV_USER_2.id },
+          { side: 'A', phoneNumber: DEV_USER_1.phone },
+          { side: 'B', phoneNumber: DEV_USER_2.phone },
         ],
       },
     }, 201);
     assert(tMatch.ok, 'Create tournament match returns 201');
     mergeState({ tournamentMatchId: tMatch.data?.data?.match?.id });
   }
+
+  logStep('POST /api/v1/teams (create two teams for team match E2E)');
+  const team1Res = await apiExpect('POST', '/api/v1/teams', {
+    token,
+    body: {
+      sportId,
+      name: 'Team Alpha E2E',
+      shortName: 'TA',
+    },
+  }, 201);
+  const team2Res = await apiExpect('POST', '/api/v1/teams', {
+    token,
+    body: {
+      sportId,
+      name: 'Team Beta E2E',
+      shortName: 'TB',
+    },
+  }, 201);
+  assert(team1Res.ok && team2Res.ok, 'Create teams for team match returns 201');
+
+  logStep('POST /api/v1/matches (team match using teamName)');
+  const teamMatch = await apiExpect('POST', '/api/v1/matches', {
+    token,
+    body: {
+      sportId,
+      matchType: 'team',
+      venue: 'Team Arena',
+      participants: [
+        { side: 'A', teamName: 'Team Alpha E2E' },
+        { side: 'B', teamName: 'Team Beta E2E' },
+      ],
+    },
+  }, 201);
+  assert(teamMatch.ok, 'Create team match using teamName returns 201');
+  const participants = teamMatch.data?.data?.match?.participants;
+  assert(!!participants, 'Team match has participants');
+  
+  const sideAParticipant = participants?.find((p) => p.side === 'A');
+  assert(sideAParticipant?.team?.name === 'Team Alpha E2E', 'Side A team name matches');
+  assert(!!sideAParticipant?.team?.captain, 'Side A team captain is present');
+  assert(sideAParticipant?.team?.captain?.id === DEV_USER_1.id, 'Side A team captain is DEV_USER_1');
 
   logStep('POST /api/v1/matches without auth (expect 401)');
   const noAuth = await apiExpect('POST', '/api/v1/matches', {

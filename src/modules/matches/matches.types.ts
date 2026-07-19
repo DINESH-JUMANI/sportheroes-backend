@@ -16,7 +16,11 @@ export interface PublicMatchParticipant {
   teamId: string | null;
   isWinner: boolean;
   user?: { id: string; fullName: string; displayName: string | null };
-  team?: { id: string; name: string };
+  team?: {
+    id: string;
+    name: string;
+    captain?: { id: string; fullName: string; displayName: string | null } | null;
+  };
 }
 
 export interface PublicMatchSet {
@@ -65,14 +69,14 @@ export interface PublicMatch {
 }
 
 type MatchWithRelations = Match & {
-  participants?: (MatchParticipant & { user?: User | null; team?: Team | null })[];
+  participants?: (MatchParticipant & { user?: User | null; team?: (Team & { captain?: User | null }) | null })[];
   sets?: MatchSet[];
   points?: MatchPoint[];
   statusLogs?: MatchStatusLog[];
 };
 
 export function toPublicMatchParticipant(
-  p: MatchParticipant & { user?: User | null; team?: Team | null },
+  p: MatchParticipant & { user?: User | null; team?: (Team & { captain?: User | null }) | null },
 ): PublicMatchParticipant {
   return {
     id: p.id,
@@ -83,7 +87,19 @@ export function toPublicMatchParticipant(
     user: p.user
       ? { id: p.user.id, fullName: p.user.fullName, displayName: p.user.displayName }
       : undefined,
-    team: p.team ? { id: p.team.id, name: p.team.name } : undefined,
+    team: p.team
+      ? {
+          id: p.team.id,
+          name: p.team.name,
+          captain: p.team.captain
+            ? {
+                id: p.team.captain.id,
+                fullName: p.team.captain.fullName,
+                displayName: p.team.captain.displayName,
+              }
+            : null,
+        }
+      : undefined,
   };
 }
 
