@@ -9,7 +9,7 @@ VALUES
     'TT',
     false,
     'Fast-paced racket sport played on a table',
-    '{"sets_to_win":3,"best_of_sets":5,"points_per_set":11,"win_by_margin":2,"deuce_enabled":true}'::jsonb,
+    '{"sets_to_win":3,"best_of_sets":5,"points_per_set":11,"win_by_margin":2,"deuce_enabled":true,"serve_switch_interval":2,"deuce_serve_switch_interval":1,"sport_code":"TT"}'::jsonb,
     true
 ),
 (
@@ -17,7 +17,7 @@ VALUES
     'BAD',
     false,
     'Racket sport played with a shuttlecock',
-    '{"sets_to_win":2,"best_of_sets":3,"points_per_set":21,"win_by_margin":2,"deuce_enabled":true}'::jsonb,
+    '{"sets_to_win":2,"best_of_sets":3,"points_per_set":21,"win_by_margin":2,"deuce_enabled":true,"sport_code":"BAD"}'::jsonb,
     true
 ),
 (

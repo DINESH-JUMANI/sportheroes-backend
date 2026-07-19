@@ -55,6 +55,7 @@ export class MatchesController {
       req.params.id,
       req.user!.id,
       req.body.scoringSide,
+      req.body.pointType,
     );
     res.status(200).json({ success: true, message: 'Point recorded', data: { match } });
   }

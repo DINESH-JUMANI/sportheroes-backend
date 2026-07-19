@@ -1,4 +1,4 @@
-import { MatchStatusType, Prisma } from '@prisma/client';
+import { MatchStatusType, Prisma, PointType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
@@ -98,6 +98,10 @@ export class MatchesService {
       include: {
         participants: { include: { user: true, team: true } },
         sets: { orderBy: { setNumber: 'asc' } },
+        points: {
+          where: { isUndone: false },
+          orderBy: { pointNumber: 'asc' },
+        },
       },
     });
     if (!match) throw new NotFoundError('Match not found');
@@ -150,6 +154,10 @@ export class MatchesService {
         include: {
           participants: { include: { user: true, team: true } },
           sets: { orderBy: { setNumber: 'asc' } },
+          points: {
+            where: { isUndone: false },
+            orderBy: { pointNumber: 'asc' },
+          },
         },
       });
 
@@ -169,8 +177,13 @@ export class MatchesService {
     return toPublicMatch(updated);
   }
 
-  async recordPoint(matchId: string, userId: string, scoringSide: 'A' | 'B') {
-    await matchScoringService.recordPoint(matchId, userId, scoringSide);
+  async recordPoint(
+    matchId: string,
+    userId: string,
+    scoringSide: 'A' | 'B',
+    pointType?: PointType,
+  ) {
+    await matchScoringService.recordPoint(matchId, userId, scoringSide, pointType);
     return this.getById(matchId);
   }
 

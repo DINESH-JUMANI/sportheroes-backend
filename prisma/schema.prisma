@@ -93,6 +93,14 @@ enum MatchSideType {
   @@map("match_side_type")
 }
 
+enum PointType {
+  normal
+  service_fault
+  let
+
+  @@map("point_type")
+}
+
 model User {
   id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firebaseUid       String     @unique @map("firebase_uid") @db.VarChar(128)
@@ -375,6 +383,8 @@ model MatchPoint {
   scoringSide     MatchSideType @map("scoring_side")
   sideAScoreAfter Int           @map("side_a_score_after")
   sideBScoreAfter Int           @map("side_b_score_after")
+  pointType       PointType     @default(normal) @map("point_type")
+  serverSide      MatchSideType? @map("server_side")
   isUndone        Boolean       @default(false) @map("is_undone")
   recordedBy      String        @map("recorded_by") @db.Uuid
   recordedAt      DateTime      @default(now()) @map("recorded_at") @db.Timestamptz(6)

@@ -18,6 +18,8 @@ const SCRIPTS = [
   '03-teams.e2e.js',
   '04-tournaments.e2e.js',
   '05-matches.e2e.js',
+  '05b-tt-rules.e2e.js',
+  '05c-badminton-rules.e2e.js',
   '06-statistics.e2e.js',
 ];
 

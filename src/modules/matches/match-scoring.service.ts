@@ -1,4 +1,4 @@
-import { MatchSideType, MatchStatusType, Prisma } from '@prisma/client';
+import { MatchSideType, MatchStatusType, Prisma, PointType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
@@ -6,6 +6,7 @@ import {
   getMatchWinnerSide,
   isSetWon,
   parseMatchFormat,
+  currentServer,
 } from '../../utils/match-format';
 import { statisticsService } from '../statistics/statistics.service';
 
@@ -23,7 +24,12 @@ export class MatchScoringService {
     });
   }
 
-  async recordPoint(matchId: string, userId: string, scoringSide: MatchSideType) {
+  async recordPoint(
+    matchId: string,
+    userId: string,
+    scoringSide: MatchSideType,
+    pointType: PointType = 'normal',
+  ) {
     return prisma.$transaction(async (tx) => {
       const match = await tx.match.findUnique({
         where: { id: matchId },
@@ -57,15 +63,92 @@ export class MatchScoringService {
         });
       }
 
-      const newSideA =
-        scoringSide === 'A' ? currentSet.sideAScore + 1 : currentSet.sideAScore;
-      const newSideB =
-        scoringSide === 'B' ? currentSet.sideBScore + 1 : currentSet.sideBScore;
+      // Compute server side BEFORE the point is recorded (stateless based on scores before this rally)
+      let serverSide: MatchSideType | null = null;
+      if (typeof format.serve_switch_interval === 'number' || format.sport_code === 'BAD') {
+        // Fetch active set points to find lastPointSide for Badminton
+        const activeSetPoints = await tx.matchPoint.findMany({
+          where: { matchId, matchSetId: currentSet.id, isUndone: false },
+          orderBy: { pointNumber: 'asc' },
+        });
+
+        // Fetch first point of the match to check for custom initial server
+        const firstPoint = await tx.matchPoint.findFirst({
+          where: { matchId },
+          orderBy: [{ recordedAt: 'asc' }, { pointNumber: 'asc' }],
+        });
+
+        let initialServerOfSet1: 'A' | 'B' = 'A';
+        if (firstPoint && firstPoint.serverSide) {
+          initialServerOfSet1 = firstPoint.serverSide as 'A' | 'B';
+        } else {
+          const customFirst = (format as any).firstServer || (format as any).first_server;
+          if (customFirst === 'A' || customFirst === 'B') {
+            initialServerOfSet1 = customFirst;
+          }
+        }
+
+        let initialServerOfCurrentSet: 'A' | 'B' = 'A';
+        if (format.sport_code === 'BAD') {
+          if (currentSet.setNumber === 1) {
+            initialServerOfCurrentSet = initialServerOfSet1;
+          } else {
+            const prevSet = match.sets.find((s) => s.setNumber === currentSet.setNumber - 1);
+            initialServerOfCurrentSet = (prevSet?.winnerSide as 'A' | 'B') || initialServerOfSet1;
+          }
+        } else {
+          initialServerOfCurrentSet =
+            currentSet.setNumber % 2 === 1
+              ? initialServerOfSet1
+              : (initialServerOfSet1 === 'A' ? 'B' : 'A');
+        }
+
+        let lastPointSide: 'A' | 'B' | null = null;
+        if (activeSetPoints.length > 0) {
+          const nonLetPoints = activeSetPoints.filter(p => p.pointType !== 'let');
+          if (nonLetPoints.length > 0) {
+            lastPointSide = nonLetPoints[nonLetPoints.length - 1].scoringSide as 'A' | 'B';
+          }
+        }
+
+        serverSide = currentServer(
+          currentSet.sideAScore,
+          currentSet.sideBScore,
+          initialServerOfCurrentSet,
+          format,
+          lastPointSide,
+        );
+      }
 
       const lastPoint = await tx.matchPoint.findFirst({
         where: { matchId, matchSetId: currentSet.id },
         orderBy: { pointNumber: 'desc' },
       });
+
+      if (pointType === 'let') {
+        // For a let, the score does not change.
+        const point = await tx.matchPoint.create({
+          data: {
+            matchId,
+            matchSetId: currentSet.id,
+            pointNumber: (lastPoint?.pointNumber ?? 0) + 1,
+            scoringSide, // required by DB constraint
+            sideAScoreAfter: currentSet.sideAScore,
+            sideBScoreAfter: currentSet.sideBScore,
+            recordedBy: userId,
+            pointType,
+            serverSide,
+          },
+        });
+
+        Logger.debug('Let point recorded', { matchId, scoringSide, pointId: point.id });
+        return point;
+      }
+
+      const newSideA =
+        scoringSide === 'A' ? currentSet.sideAScore + 1 : currentSet.sideAScore;
+      const newSideB =
+        scoringSide === 'B' ? currentSet.sideBScore + 1 : currentSet.sideBScore;
 
       const point = await tx.matchPoint.create({
         data: {
@@ -76,6 +159,8 @@ export class MatchScoringService {
           sideAScoreAfter: newSideA,
           sideBScoreAfter: newSideB,
           recordedBy: userId,
+          pointType,
+          serverSide,
         },
       });
 

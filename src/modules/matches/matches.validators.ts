@@ -30,6 +30,7 @@ export const createMatchSchema = z.object({
 
 export const recordPointSchema = z.object({
   scoringSide: z.enum(['A', 'B']),
+  pointType: z.enum(['normal', 'service_fault', 'let']).optional(),
 });
 
 export const cancelMatchSchema = z.object({
