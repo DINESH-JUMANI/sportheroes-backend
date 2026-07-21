@@ -61,6 +61,10 @@ Send Firebase ID token after phone OTP verification on the client.
 
 Same shape with `"isNewUser": true` and `"message": "Account created successfully"`.
 
+### Placeholder users (added to a team by phone)
+
+If someone was added to a team via phone number before they signed up (`POST /api/v1/teams/:id/members`), their account exists as a placeholder. When they later complete Firebase phone OTP and call `POST /api/v1/auth/login`, the backend **merges** that placeholder into their real Firebase account — same `user.id`, team memberships preserved.
+
 ---
 
 ## 2. Get Current User
@@ -144,3 +148,10 @@ Content-Type: application/json
 ```
 
 Token expires after `AUTH_TOKEN_EXPIRY_DAYS` (default 7). Re-login via Firebase OTP when expired.
+
+---
+
+## Related modules
+
+- Teams (add members by phone): `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+- Global search: `src/modules/search/FE_INTEGRATION_GUIDE.md`

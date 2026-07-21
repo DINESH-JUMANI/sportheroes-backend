@@ -109,6 +109,21 @@
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *
+ * /api/v1/sports/code/{code}/rules:
+ *   get:
+ *     tags: [Sports]
+ *     summary: Get sport-specific rules and scoring config
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema: { type: string, example: VB }
+ *     responses:
+ *       200:
+ *         description: Sport rules
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *
  * /api/v1/sports/{id}:
  *   get:
  *     tags: [Sports]

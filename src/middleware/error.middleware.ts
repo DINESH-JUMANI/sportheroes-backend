@@ -2,16 +2,28 @@ import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../utils/errors';
 import { Logger } from '../utils/logger';
 
-export function notFoundHandler(req: Request, res: Response): void {
-  Logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
-
-  res.status(404).json({
+/** Unified error envelope — same top-level keys as success (`success`, `message`, `data`). */
+function sendError(
+  res: Response,
+  statusCode: number,
+  message: string,
+  code: string,
+  details?: unknown,
+): void {
+  res.status(statusCode).json({
     success: false,
+    message,
+    data: null,
     error: {
-      code: 'ROUTE_NOT_FOUND',
-      message: 'The requested endpoint does not exist',
+      code,
+      ...(details !== undefined ? { details } : {}),
     },
   });
+}
+
+export function notFoundHandler(req: Request, res: Response): void {
+  Logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
+  sendError(res, 404, 'The requested endpoint does not exist', 'ROUTE_NOT_FOUND');
 }
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
@@ -21,24 +33,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
       details: err.details,
     });
 
-    res.status(err.statusCode).json({
-      success: false,
-      error: {
-        code: err.code,
-        message: err.message,
-        ...(err.details !== undefined ? { details: err.details } : {}),
-      },
-    });
+    sendError(res, err.statusCode, err.message, err.code, err.details);
     return;
   }
 
   Logger.error(`Unhandled error on ${req.method} ${req.originalUrl}`, err);
-
-  res.status(500).json({
-    success: false,
-    error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'An unexpected error occurred',
-    },
-  });
+  sendError(res, 500, 'An unexpected error occurred', 'INTERNAL_SERVER_ERROR');
 }

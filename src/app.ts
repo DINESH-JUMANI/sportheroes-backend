@@ -12,7 +12,10 @@ import playersRoutes from './modules/players/players.routes';
 import teamsRoutes from './modules/teams/teams.routes';
 import tournamentsRoutes from './modules/tournaments/tournaments.routes';
 import matchesRoutes from './modules/matches/matches.routes';
+import searchRoutes from './modules/search/search.routes';
 import statisticsRoutes from './modules/statistics/statistics.routes';
+import venuesRoutes from './modules/venues/venues.routes';
+import supportRoutes from './modules/support/support.routes';
 import { Logger } from './utils/logger';
 
 const app = express();
@@ -35,6 +38,9 @@ app.use('/api/v1/teams', teamsRoutes);
 app.use('/api/v1/tournaments', tournamentsRoutes);
 app.use('/api/v1/matches', matchesRoutes);
 app.use('/api/v1/statistics', statisticsRoutes);
+app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/venues', venuesRoutes);
+app.use('/api/v1/support', supportRoutes);
 
 app.get('/health', async (_req: Request, res: Response) => {
   let dbConnected = false;
@@ -74,6 +80,9 @@ app.get('/', (_req: Request, res: Response) => {
       tournaments: '/api/v1/tournaments',
       matches: '/api/v1/matches',
       statistics: '/api/v1/statistics',
+      search: '/api/v1/search',
+      venues: '/api/v1/venues',
+      support: '/api/v1/support',
     },
   });
 });

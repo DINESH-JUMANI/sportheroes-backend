@@ -1,41 +1,59 @@
 import { Request, Response } from 'express';
+import { sendSuccess } from '../../utils/api-response';
 import { teamsService } from './teams.service';
 
 export class TeamsController {
   async create(req: Request, res: Response): Promise<void> {
     const team = await teamsService.create(req.user!.id, req.body);
-    res.status(201).json({ success: true, message: 'Team created', data: { team } });
+    sendSuccess(res, 'Team created', { team }, 201);
   }
 
   async list(req: Request, res: Response): Promise<void> {
     const query = req.query as unknown as {
       page: number;
       limit: number;
-      sportId?: string;
       activeOnly: boolean;
     };
-    const result = await teamsService.list(query.page, query.limit, query.sportId, query.activeOnly);
-    res.status(200).json({ success: true, data: result });
+    const result = await teamsService.list(query.page, query.limit, query.activeOnly);
+    sendSuccess(res, 'Teams fetched', result);
   }
 
   async getById(req: Request, res: Response): Promise<void> {
     const team = await teamsService.getById(req.params.id);
-    res.status(200).json({ success: true, data: { team } });
+    sendSuccess(res, 'Team fetched', { team });
   }
 
   async update(req: Request, res: Response): Promise<void> {
     const team = await teamsService.update(req.params.id, req.user!.id, req.body);
-    res.status(200).json({ success: true, message: 'Team updated', data: { team } });
+    sendSuccess(res, 'Team updated', { team });
+  }
+
+  async uploadLogo(req: Request, res: Response): Promise<void> {
+    const team = await teamsService.uploadLogo(req.params.id, req.user!.id, req.body);
+    sendSuccess(res, 'Team logo updated', { team });
+  }
+
+  async getLogo(req: Request, res: Response): Promise<void> {
+    const { buffer, mimeType } = await teamsService.getLogo(req.params.id);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.status(200).send(buffer);
   }
 
   async remove(req: Request, res: Response): Promise<void> {
     await teamsService.softDelete(req.params.id, req.user!.id);
-    res.status(200).json({ success: true, message: 'Team deleted' });
+    sendSuccess(res, 'Team deleted');
+  }
+
+  async lookupUser(req: Request, res: Response): Promise<void> {
+    const { phoneNumber } = req.query as { phoneNumber: string };
+    const result = await teamsService.lookupUserByPhone(phoneNumber);
+    sendSuccess(res, 'User lookup completed', result);
   }
 
   async addMember(req: Request, res: Response): Promise<void> {
     const member = await teamsService.addMember(req.params.id, req.user!.id, req.body);
-    res.status(201).json({ success: true, message: 'Member added', data: { member } });
+    sendSuccess(res, 'Member added', { member }, 201);
   }
 
   async updateMember(req: Request, res: Response): Promise<void> {
@@ -45,17 +63,17 @@ export class TeamsController {
       req.user!.id,
       req.body,
     );
-    res.status(200).json({ success: true, message: 'Member updated', data: { member } });
+    sendSuccess(res, 'Member updated', { member });
   }
 
   async removeMember(req: Request, res: Response): Promise<void> {
     await teamsService.removeMember(req.params.id, req.params.memberId, req.user!.id);
-    res.status(200).json({ success: true, message: 'Member removed' });
+    sendSuccess(res, 'Member removed');
   }
 
   async listMembers(req: Request, res: Response): Promise<void> {
     const members = await teamsService.listMembers(req.params.id);
-    res.status(200).json({ success: true, data: { members } });
+    sendSuccess(res, 'Members fetched', { members });
   }
 }
 

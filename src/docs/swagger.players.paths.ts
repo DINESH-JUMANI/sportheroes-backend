@@ -125,4 +125,4 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-export {};
+export { };

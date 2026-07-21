@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { dateStringSchema, paginationSchema } from '../../utils/pagination';
+import { normalizePhoneNumber } from '../../utils/phone';
 
 export const listTournamentsQuerySchema = paginationSchema.extend({
   sportId: z.string().uuid().optional(),
@@ -50,12 +51,19 @@ export const updateTournamentStatusSchema = z.object({
 
 export const registerParticipantSchema = z
   .object({
-    userId: z.string().uuid().optional(),
+    phoneNumber: z
+      .string()
+      .trim()
+      .min(8)
+      .max(20)
+      .transform((v) => normalizePhoneNumber(v))
+      .optional(),
+    fullName: z.string().trim().min(1).max(150).optional(),
     teamId: z.string().uuid().optional(),
     seedNumber: z.number().int().min(1).optional(),
   })
-  .refine((d) => Boolean(d.userId) !== Boolean(d.teamId), {
-    message: 'Provide exactly one of userId or teamId',
+  .refine((d) => Boolean(d.phoneNumber) !== Boolean(d.teamId), {
+    message: 'Provide exactly one of phoneNumber or teamId',
   });
 
 export const updateParticipantSchema = z.object({

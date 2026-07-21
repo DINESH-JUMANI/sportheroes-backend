@@ -15,6 +15,9 @@
  *         name: sportId
  *         schema: { type: string, format: uuid }
  *       - in: query
+ *         name: sportCode
+ *         schema: { type: string, example: TT }
+ *       - in: query
  *         name: tournamentId
  *         schema: { type: string, format: uuid }
  *       - in: query
@@ -25,6 +28,10 @@
  *       - in: query
  *         name: createdBy
  *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: participantPhone
+ *         schema: { type: string, example: '+919999999999' }
+ *         description: Filter matches where this phone is a participant
  *     responses:
  *       200:
  *         description: Paginated matches
@@ -51,30 +58,42 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [sportId, matchType, participants]
+ *             required: [matchType, bestOfSets, participants]
  *             properties:
- *               sportId: { type: string, format: uuid }
+ *               sportCode: { type: string, example: TT, description: Preferred over sportId }
+ *               sportId: { type: string, format: uuid, description: Legacy alternative }
  *               tournamentId: { type: string, format: uuid, nullable: true }
  *               tournamentRoundId: { type: string, format: uuid, nullable: true }
  *               matchType: { type: string, enum: [singles, doubles, team] }
- *               venue: { type: string }
+ *               bestOfSets:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 3
+ *                 description: Best-of N sets (FE dropdown 1–5). Snapshots matchFormat with sets_to_win = ceil(N/2).
+ *               venueId: { type: string, format: uuid, description: Preferred — link to venues table }
+ *               venue: { type: string, description: Optional free-text venue name if no venueId }
  *               scheduledAt: { type: string, format: date-time }
  *               participants:
  *                 type: array
  *                 minItems: 2
+ *                 description: Both sides must be chosen explicitly. Creator is NOT auto-added as a player.
  *                 items:
  *                   type: object
  *                   required: [side]
  *                   properties:
  *                     side: { type: string, enum: [A, B] }
- *                     userId: { type: string, format: uuid }
- *                     teamId: { type: string, format: uuid }
+ *                     phoneNumber: { type: string, example: '+919000000001', description: For individual players }
+ *                     fullName: { type: string, description: Required if phone is not registered yet }
+ *                     teamId: { type: string, format: uuid, description: For team matches }
  *           example:
- *             sportId: "00000000-0000-0000-0000-000000000001"
+ *             sportCode: TT
  *             matchType: singles
+ *             bestOfSets: 3
+ *             venueId: "00000000-0000-4000-8000-000000000010"
  *             participants:
- *               - { side: A, userId: "a0000000-0000-4000-8000-000000000001" }
- *               - { side: B, userId: "a0000000-0000-4000-8000-000000000002" }
+ *               - { side: A, phoneNumber: '+919000000001' }
+ *               - { side: B, phoneNumber: '+919000000002' }
  *     responses:
  *       201:
  *         description: Match created
@@ -277,19 +296,77 @@
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *
- * /api/v1/matches/{id}/complete:
+ * /api/v1/matches/{id}/finish-set:
  *   post:
  *     tags: [Matches]
- *     summary: Manually complete match
+ *     summary: Finish the current set
+ *     description: |
+ *       Marks the open set as won (by score or optional winnerSide).
+ *       Opens the next set if the match is not decided yet.
+ *       Completes the match (and updates stats) when a side reaches sets_to_win.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               winnerSide:
+ *                 type: string
+ *                 enum: [A, B]
+ *                 description: Required when set scores are tied
  *     responses:
  *       200:
- *         description: Match completed
+ *         description: Set finished (match may now be completed or next set opened)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 message: { type: string }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     match: { $ref: '#/components/schemas/Match' }
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *
+ * /api/v1/matches/{id}/complete:
+ *   post:
+ *     tags: [Matches]
+ *     summary: Manually complete match and update statistics
+ *     description: |
+ *       Resolves winner from set scores (or optional winnerSide), marks winners,
+ *       and recalculates player/team stats + rankings.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               winnerSide:
+ *                 type: string
+ *                 enum: [A, B]
+ *                 description: Required only if winner cannot be derived from scores
+ *     responses:
+ *       200:
+ *         description: Match completed with stats updated
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  *       401:
@@ -325,4 +402,4 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-export {};
+export { };

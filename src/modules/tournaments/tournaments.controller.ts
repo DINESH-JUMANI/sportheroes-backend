@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
+import { sendSuccess } from '../../utils/api-response';
 import { tournamentsService } from './tournaments.service';
 
 export class TournamentsController {
   async create(req: Request, res: Response): Promise<void> {
     const tournament = await tournamentsService.create(req.user!.id, req.body);
-    res.status(201).json({ success: true, message: 'Tournament created', data: { tournament } });
+    sendSuccess(res, 'Tournament created', { tournament }, 201);
   }
 
   async list(req: Request, res: Response): Promise<void> {
@@ -14,18 +15,23 @@ export class TournamentsController {
       sportId?: string;
       status?: string;
     };
-    const result = await tournamentsService.list(query.page, query.limit, query.sportId, query.status);
-    res.status(200).json({ success: true, data: result });
+    const result = await tournamentsService.list(
+      query.page,
+      query.limit,
+      query.sportId,
+      query.status,
+    );
+    sendSuccess(res, 'Tournaments fetched', result);
   }
 
   async getById(req: Request, res: Response): Promise<void> {
     const tournament = await tournamentsService.getById(req.params.id);
-    res.status(200).json({ success: true, data: { tournament } });
+    sendSuccess(res, 'Tournament fetched', { tournament });
   }
 
   async update(req: Request, res: Response): Promise<void> {
     const tournament = await tournamentsService.update(req.params.id, req.user!.id, req.body);
-    res.status(200).json({ success: true, message: 'Tournament updated', data: { tournament } });
+    sendSuccess(res, 'Tournament updated', { tournament });
   }
 
   async updateStatus(req: Request, res: Response): Promise<void> {
@@ -34,7 +40,7 @@ export class TournamentsController {
       req.user!.id,
       req.body.status,
     );
-    res.status(200).json({ success: true, message: 'Status updated', data: { tournament } });
+    sendSuccess(res, 'Status updated', { tournament });
   }
 
   async registerParticipant(req: Request, res: Response): Promise<void> {
@@ -43,12 +49,12 @@ export class TournamentsController {
       req.user!.id,
       req.body,
     );
-    res.status(201).json({ success: true, message: 'Registered', data: { participant } });
+    sendSuccess(res, 'Registered', { participant }, 201);
   }
 
   async listParticipants(req: Request, res: Response): Promise<void> {
     const participants = await tournamentsService.listParticipants(req.params.id);
-    res.status(200).json({ success: true, data: { participants } });
+    sendSuccess(res, 'Participants fetched', { participants });
   }
 
   async updateParticipant(req: Request, res: Response): Promise<void> {
@@ -58,22 +64,22 @@ export class TournamentsController {
       req.user!.id,
       req.body,
     );
-    res.status(200).json({ success: true, message: 'Participant updated', data: { participant } });
+    sendSuccess(res, 'Participant updated', { participant });
   }
 
   async createRound(req: Request, res: Response): Promise<void> {
     const round = await tournamentsService.createRound(req.params.id, req.user!.id, req.body);
-    res.status(201).json({ success: true, message: 'Round created', data: { round } });
+    sendSuccess(res, 'Round created', { round }, 201);
   }
 
   async listRounds(req: Request, res: Response): Promise<void> {
     const rounds = await tournamentsService.listRounds(req.params.id);
-    res.status(200).json({ success: true, data: { rounds } });
+    sendSuccess(res, 'Rounds fetched', { rounds });
   }
 
   async getStandings(req: Request, res: Response): Promise<void> {
     const standings = await tournamentsService.getStandings(req.params.id);
-    res.status(200).json({ success: true, data: { standings } });
+    sendSuccess(res, 'Standings fetched', { standings });
   }
 }
 

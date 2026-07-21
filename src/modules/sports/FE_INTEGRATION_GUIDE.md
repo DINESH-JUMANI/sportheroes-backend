@@ -48,7 +48,7 @@ Run seed if sports are missing: `npm run db:seed:sports`
         "updatedAt": "..."
       }
     ],
-    "meta": { "page": 1, "limit": 20, "total": 4, "totalPages": 1 }
+    "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 }
   }
 }
 ```
@@ -182,7 +182,72 @@ Sets `isActive: false` so historical matches/teams keep valid FKs.
 | Badminton | BAD | no |
 | Volleyball | VB | yes |
 | Pickleball | PBL | no |
+| Tennis | TEN | no |
 
 ```bash
 npm run db:seed:sports
+npm run db:migrate:11   # sport-specific rule tables (if not applied)
 ```
+
+---
+
+## 7. Get Sport-Specific Rules
+
+**GET** `/api/v1/sports/code/:code/rules`
+
+Returns per-sport configuration: supported match types, team roster rules, captain flags, roster limits, match format, and scoring config. Use this before creating teams or matches so the UI can show the right options per sport.
+
+Example: `/api/v1/sports/code/VB/rules`
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "rules": {
+      "sportId": "uuid",
+      "sportCode": "VB",
+      "supportsSingles": false,
+      "supportsDoubles": false,
+      "supportsTeamMatches": true,
+      "usesTeamRoster": true,
+      "hasCaptain": true,
+      "hasViceCaptain": true,
+      "minRosterSize": 6,
+      "maxRosterSize": 15,
+      "minPlayersPerSide": 6,
+      "maxPlayersPerSide": 12,
+      "matchFormat": {
+        "sets_to_win": 3,
+        "best_of_sets": 5,
+        "points_per_set": 25,
+        "win_by_margin": 2,
+        "deuce_enabled": true,
+        "deciding_set_points": 15
+      },
+      "scoringConfig": {
+        "points_to_win_set": 25,
+        "difference_to_win_set": 2,
+        "best_of_sets": 5,
+        "deciding_set_points": 15,
+        "event_types": ["point_won", "kill", "block", "ace", "dig", "error"]
+      }
+    }
+  }
+}
+```
+
+### Errors
+
+| Status | When |
+|--------|------|
+| `404` | Unknown sport code or rules not seeded |
+
+---
+
+## Related modules
+
+- Player profiles: `src/modules/players/FE_INTEGRATION_GUIDE.md`
+- Teams (use `sportCode` when creating): `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+- Global search: `src/modules/search/FE_INTEGRATION_GUIDE.md`

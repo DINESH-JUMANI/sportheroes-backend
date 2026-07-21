@@ -80,6 +80,8 @@ Points are recorded on `ongoing` matches. Match auto-completes when a side wins 
 
 `matchFormat` is copied from the sport's `defaultMatchFormat` automatically.
 
+**Before creating a match**, call `GET /api/v1/sports/code/:code/rules` to determine which `matchType` values are valid for that sport (e.g. volleyball supports `team` only; table tennis supports `singles` and `doubles`).
+
 ### Response `201`
 
 ```json
@@ -404,3 +406,11 @@ Force-complete from `ongoing` or `paused`. Normally scoring auto-completes.
 4. Poll `GET /api/v1/matches/:id` every 3-5 seconds for spectators
 5. Wrong score → `POST /api/v1/matches/:id/undo-point`
 6. On `status: completed` → navigate to match summary, stats update automatically
+
+---
+
+## Related modules
+
+- Sport rules (valid match types per sport): `src/modules/sports/FE_INTEGRATION_GUIDE.md`
+- Teams (for `matchType: team`): `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+- Global search: `src/modules/search/FE_INTEGRATION_GUIDE.md`

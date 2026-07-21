@@ -8,9 +8,6 @@
  *         code:
  *           type: string
  *           example: VALIDATION_ERROR
- *         message:
- *           type: string
- *           example: Validation failed
  *         details:
  *           type: array
  *           items:
@@ -21,12 +18,35 @@
  *               message:
  *                 type: string
  *
+ *     SuccessResponse:
+ *       type: object
+ *       required: [success, message, data]
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           description: Human-readable message for FE modals / toasts
+ *           example: Match created
+ *         data:
+ *           description: Payload (object, list wrapper, or null)
+ *           nullable: true
+ *
  *     ErrorResponse:
  *       type: object
+ *       required: [success, message, data]
  *       properties:
  *         success:
  *           type: boolean
  *           example: false
+ *         message:
+ *           type: string
+ *           description: Human-readable message for FE modals / toasts
+ *           example: Validation failed
+ *         data:
+ *           nullable: true
+ *           example: null
  *         error:
  *           $ref: '#/components/schemas/ErrorBody'
  *
@@ -198,7 +218,7 @@
  *           format: uuid
  *         role:
  *           type: string
- *           enum: [captain, vice_captain, member]
+ *           enum: [admin, captain, vice_captain, member]
  *         joinedAt:
  *           type: string
  *           format: date-time
@@ -228,15 +248,17 @@
  *         id:
  *           type: string
  *           format: uuid
- *         sportId:
- *           type: string
- *           format: uuid
  *         name:
  *           type: string
  *         shortName:
  *           type: string
  *           nullable: true
  *         logoUrl:
+ *           type: string
+ *           nullable: true
+ *         hasLogo:
+ *           type: boolean
+ *         logoMimeType:
  *           type: string
  *           nullable: true
  *         description:
@@ -255,15 +277,6 @@
  *           format: uuid
  *         isActive:
  *           type: boolean
- *         sport:
- *           type: object
- *           properties:
- *             id:
- *               type: string
- *             name:
- *               type: string
- *             code:
- *               type: string
  *         members:
  *           type: array
  *           items:

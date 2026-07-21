@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { sendSuccess } from '../../utils/api-response';
 import { statisticsService } from './statistics.service';
 
 export class StatisticsController {
@@ -7,12 +8,12 @@ export class StatisticsController {
       req.params.userId,
       req.query.sportId as string | undefined,
     );
-    res.status(200).json({ success: true, data: { stats } });
+    sendSuccess(res, 'Player statistics fetched', { stats });
   }
 
   async getTeamStats(req: Request, res: Response): Promise<void> {
     const stats = await statisticsService.getTeamStats(req.params.teamId);
-    res.status(200).json({ success: true, data: { stats } });
+    sendSuccess(res, 'Team statistics fetched', { stats });
   }
 
   async getPlayerLeaderboard(req: Request, res: Response): Promise<void> {
@@ -28,7 +29,7 @@ export class StatisticsController {
       query.limit,
       query.sortBy,
     );
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, 'Player leaderboard fetched', result);
   }
 
   async getTeamLeaderboard(req: Request, res: Response): Promise<void> {
@@ -44,7 +45,7 @@ export class StatisticsController {
       query.sportId,
       query.sortBy,
     );
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, 'Team leaderboard fetched', result);
   }
 }
 

@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
+import { sendSuccess } from '../../utils/api-response';
 import { matchesService } from './matches.service';
 
 export class MatchesController {
   async create(req: Request, res: Response): Promise<void> {
     const match = await matchesService.create(req.user!.id, req.body);
-    res.status(201).json({ success: true, message: 'Match created', data: { match } });
+    sendSuccess(res, 'Match created', { match }, 201);
   }
 
   async list(req: Request, res: Response): Promise<void> {
@@ -12,42 +13,46 @@ export class MatchesController {
       page: number;
       limit: number;
       sportId?: string;
+      sportCode?: string;
       tournamentId?: string;
       status?: string;
       createdBy?: string;
+      participantPhone?: string;
     };
     const result = await matchesService.list(query.page, query.limit, {
       sportId: query.sportId,
+      sportCode: query.sportCode,
       tournamentId: query.tournamentId,
       status: query.status,
       createdBy: query.createdBy,
+      participantPhone: query.participantPhone,
     });
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, 'Matches fetched', result);
   }
 
   async getById(req: Request, res: Response): Promise<void> {
     const match = await matchesService.getById(req.params.id);
-    res.status(200).json({ success: true, data: { match } });
+    sendSuccess(res, 'Match fetched', { match });
   }
 
   async getTimeline(req: Request, res: Response): Promise<void> {
     const timeline = await matchesService.getTimeline(req.params.id);
-    res.status(200).json({ success: true, data: { timeline } });
+    sendSuccess(res, 'Match timeline fetched', { timeline });
   }
 
   async start(req: Request, res: Response): Promise<void> {
     const match = await matchesService.changeStatus(req.params.id, req.user!.id, 'ongoing');
-    res.status(200).json({ success: true, message: 'Match started', data: { match } });
+    sendSuccess(res, 'Match started', { match });
   }
 
   async pause(req: Request, res: Response): Promise<void> {
     const match = await matchesService.changeStatus(req.params.id, req.user!.id, 'paused');
-    res.status(200).json({ success: true, message: 'Match paused', data: { match } });
+    sendSuccess(res, 'Match paused', { match });
   }
 
   async resume(req: Request, res: Response): Promise<void> {
     const match = await matchesService.changeStatus(req.params.id, req.user!.id, 'ongoing');
-    res.status(200).json({ success: true, message: 'Match resumed', data: { match } });
+    sendSuccess(res, 'Match resumed', { match });
   }
 
   async recordPoint(req: Request, res: Response): Promise<void> {
@@ -56,17 +61,22 @@ export class MatchesController {
       req.user!.id,
       req.body.scoringSide,
     );
-    res.status(200).json({ success: true, message: 'Point recorded', data: { match } });
+    sendSuccess(res, 'Point recorded', { match });
   }
 
   async undoPoint(req: Request, res: Response): Promise<void> {
     const match = await matchesService.undoPoint(req.params.id, req.user!.id);
-    res.status(200).json({ success: true, message: 'Point undone', data: { match } });
+    sendSuccess(res, 'Point undone', { match });
   }
 
   async complete(req: Request, res: Response): Promise<void> {
-    const match = await matchesService.changeStatus(req.params.id, req.user!.id, 'completed');
-    res.status(200).json({ success: true, message: 'Match completed', data: { match } });
+    const match = await matchesService.completeMatch(req.params.id, req.user!.id, req.body ?? {});
+    sendSuccess(res, 'Match completed', { match });
+  }
+
+  async finishSet(req: Request, res: Response): Promise<void> {
+    const match = await matchesService.finishSet(req.params.id, req.user!.id, req.body ?? {});
+    sendSuccess(res, 'Set finished', { match });
   }
 
   async cancel(req: Request, res: Response): Promise<void> {
@@ -76,7 +86,7 @@ export class MatchesController {
       'cancelled',
       req.body?.reason,
     );
-    res.status(200).json({ success: true, message: 'Match cancelled', data: { match } });
+    sendSuccess(res, 'Match cancelled', { match });
   }
 }
 

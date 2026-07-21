@@ -26,6 +26,7 @@ enum SkillLevelType {
 }
 
 enum TeamRoleType {
+  admin
   captain
   vice_captain
   member
@@ -93,6 +94,15 @@ enum MatchSideType {
   @@map("match_side_type")
 }
 
+enum SupportTicketStatusType {
+  open
+  in_progress
+  resolved
+  closed
+
+  @@map("support_ticket_status_type")
+}
+
 model User {
   id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firebaseUid       String     @unique @map("firebase_uid") @db.VarChar(128)
@@ -123,6 +133,10 @@ model User {
   matchPointsRecorded  MatchPoint[]
   matchStatusChanges   MatchStatusLog[]
   playerStatistics     PlayerStatistics[]
+  venuesCreated        Venue[]
+  supportConcernsCreated SupportConcern[]
+  supportTicketsCreated  SupportTicket[]
+  supportTicketStatusChanges SupportTicketStatusLog[]
 
   @@index([phoneNumber], map: "idx_users_phone_number")
   @@map("users")
@@ -140,11 +154,16 @@ model Sport {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  playerSportProfiles PlayerSportProfile[]
-  teams               Team[]
-  tournaments         Tournament[]
-  matches             Match[]
-  playerStatistics    PlayerStatistics[]
+  playerSportProfiles      PlayerSportProfile[]
+  teams                    Team[]
+  tournaments              Tournament[]
+  matches                  Match[]
+  playerStatistics         PlayerStatistics[]
+  tableTennisRules         SportRulesTableTennis?
+  badmintonRules           SportRulesBadminton?
+  volleyballRules          SportRulesVolleyball?
+  pickleballRules          SportRulesPickleball?
+  tennisRules              SportRulesTennis?
 
   @@map("sports")
 }
@@ -169,10 +188,12 @@ model PlayerSportProfile {
 
 model Team {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sportId        String   @map("sport_id") @db.Uuid
+  sportId        String?  @map("sport_id") @db.Uuid
   name           String   @db.VarChar(100)
   shortName      String?  @map("short_name") @db.VarChar(10)
   logoUrl        String?  @map("logo_url") @db.Text
+  logoBlob       Bytes?   @map("logo_blob")
+  logoMimeType   String?  @map("logo_mime_type") @db.VarChar(50)
   description    String?  @db.Text
   captainId      String?  @map("captain_id") @db.Uuid
   viceCaptainId  String?  @map("vice_captain_id") @db.Uuid
@@ -181,7 +202,7 @@ model Team {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sport           Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  sport           Sport?                 @relation(fields: [sportId], references: [id], onDelete: SetNull)
   captain         User?                  @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: SetNull)
   viceCaptain     User?                  @relation("TeamViceCaptain", fields: [viceCaptainId], references: [id], onDelete: SetNull)
   creator         User                   @relation("TeamCreator", fields: [createdBy], references: [id], onDelete: Restrict)
@@ -306,6 +327,7 @@ model Match {
   matchType         MatchTypeKind   @map("match_type")
   matchFormat       Json            @map("match_format")
   venue             String?         @db.VarChar(200)
+  venueId           String?         @map("venue_id") @db.Uuid
   scheduledAt       DateTime?       @map("scheduled_at") @db.Timestamptz(6)
   startedAt         DateTime?       @map("started_at") @db.Timestamptz(6)
   finishedAt        DateTime?       @map("finished_at") @db.Timestamptz(6)
@@ -318,6 +340,7 @@ model Match {
   sport           Sport              @relation(fields: [sportId], references: [id], onDelete: Restrict)
   tournament      Tournament?        @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
   tournamentRound TournamentRound?   @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
+  venueRef        Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)
   creator         User               @relation("MatchCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   participants    MatchParticipant[]
   sets            MatchSet[]
@@ -326,6 +349,7 @@ model Match {
 
   @@index([tournamentId], map: "idx_matches_tournament")
   @@index([status], map: "idx_matches_status")
+  @@index([venueId], map: "idx_matches_venue")
   @@map("matches")
 }
 
@@ -439,4 +463,208 @@ model TeamStatistics {
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("team_statistics")
+}
+
+model Venue {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(150)
+  latitude  Float
+  longitude Float
+  address   String?  @db.VarChar(255)
+  city      String?  @db.VarChar(100)
+  state     String?  @db.VarChar(100)
+  country   String?  @db.VarChar(100)
+  createdBy String   @map("created_by") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator User    @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  matches Match[]
+
+  @@index([name], map: "idx_venues_name")
+  @@index([createdBy], map: "idx_venues_created_by")
+  @@index([isActive], map: "idx_venues_active")
+  @@map("venues")
+}
+
+model SportRulesTableTennis {
+  sportId              String   @id @map("sport_id") @db.Uuid
+  supportsSingles      Boolean  @default(true) @map("supports_singles")
+  supportsDoubles      Boolean  @default(true) @map("supports_doubles")
+  supportsTeamMatches  Boolean  @default(false) @map("supports_team_matches")
+  usesTeamRoster       Boolean  @default(false) @map("uses_team_roster")
+  hasCaptain           Boolean  @default(false) @map("has_captain")
+  hasViceCaptain       Boolean  @default(false) @map("has_vice_captain")
+  minRosterSize        Int?     @map("min_roster_size")
+  maxRosterSize        Int?     @map("max_roster_size")
+  minPlayersPerSide    Int      @default(1) @map("min_players_per_side")
+  maxPlayersPerSide    Int      @default(2) @map("max_players_per_side")
+  matchFormat          Json     @map("match_format")
+  scoringConfig        Json     @map("scoring_config")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("sport_rules_table_tennis")
+}
+
+model SportRulesBadminton {
+  sportId              String   @id @map("sport_id") @db.Uuid
+  supportsSingles      Boolean  @default(true) @map("supports_singles")
+  supportsDoubles      Boolean  @default(true) @map("supports_doubles")
+  supportsTeamMatches  Boolean  @default(false) @map("supports_team_matches")
+  usesTeamRoster       Boolean  @default(false) @map("uses_team_roster")
+  hasCaptain           Boolean  @default(false) @map("has_captain")
+  hasViceCaptain       Boolean  @default(false) @map("has_vice_captain")
+  minRosterSize        Int?     @map("min_roster_size")
+  maxRosterSize        Int?     @map("max_roster_size")
+  minPlayersPerSide    Int      @default(1) @map("min_players_per_side")
+  maxPlayersPerSide    Int      @default(2) @map("max_players_per_side")
+  matchFormat          Json     @map("match_format")
+  scoringConfig        Json     @map("scoring_config")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("sport_rules_badminton")
+}
+
+model SportRulesVolleyball {
+  sportId              String   @id @map("sport_id") @db.Uuid
+  supportsSingles      Boolean  @default(false) @map("supports_singles")
+  supportsDoubles      Boolean  @default(false) @map("supports_doubles")
+  supportsTeamMatches  Boolean  @default(true) @map("supports_team_matches")
+  usesTeamRoster       Boolean  @default(true) @map("uses_team_roster")
+  hasCaptain           Boolean  @default(true) @map("has_captain")
+  hasViceCaptain       Boolean  @default(true) @map("has_vice_captain")
+  minRosterSize        Int      @default(6) @map("min_roster_size")
+  maxRosterSize        Int      @default(15) @map("max_roster_size")
+  minPlayersPerSide    Int      @default(6) @map("min_players_per_side")
+  maxPlayersPerSide    Int      @default(12) @map("max_players_per_side")
+  matchFormat          Json     @map("match_format")
+  scoringConfig        Json     @map("scoring_config")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("sport_rules_volleyball")
+}
+
+model SportRulesPickleball {
+  sportId              String   @id @map("sport_id") @db.Uuid
+  supportsSingles      Boolean  @default(true) @map("supports_singles")
+  supportsDoubles      Boolean  @default(true) @map("supports_doubles")
+  supportsTeamMatches  Boolean  @default(false) @map("supports_team_matches")
+  usesTeamRoster       Boolean  @default(false) @map("uses_team_roster")
+  hasCaptain           Boolean  @default(false) @map("has_captain")
+  hasViceCaptain       Boolean  @default(false) @map("has_vice_captain")
+  minRosterSize        Int?     @map("min_roster_size")
+  maxRosterSize        Int?     @map("max_roster_size")
+  minPlayersPerSide    Int      @default(1) @map("min_players_per_side")
+  maxPlayersPerSide    Int      @default(2) @map("max_players_per_side")
+  matchFormat          Json     @map("match_format")
+  scoringConfig        Json     @map("scoring_config")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("sport_rules_pickleball")
+}
+
+model SportRulesTennis {
+  sportId              String   @id @map("sport_id") @db.Uuid
+  supportsSingles      Boolean  @default(true) @map("supports_singles")
+  supportsDoubles      Boolean  @default(true) @map("supports_doubles")
+  supportsTeamMatches  Boolean  @default(false) @map("supports_team_matches")
+  usesTeamRoster       Boolean  @default(false) @map("uses_team_roster")
+  hasCaptain           Boolean  @default(false) @map("has_captain")
+  hasViceCaptain       Boolean  @default(false) @map("has_vice_captain")
+  minRosterSize        Int?     @map("min_roster_size")
+  maxRosterSize        Int?     @map("max_roster_size")
+  minPlayersPerSide    Int      @default(1) @map("min_players_per_side")
+  maxPlayersPerSide    Int      @default(2) @map("max_players_per_side")
+  matchFormat          Json     @map("match_format")
+  scoringConfig        Json     @map("scoring_config")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@map("sport_rules_tennis")
+}
+
+model SupportConcern {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique @db.VarChar(50)
+  label       String   @db.VarChar(150)
+  description String?  @db.VarChar(500)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isOther     Boolean  @default(false) @map("is_other")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator User?           @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  tickets SupportTicket[]
+
+  @@index([isActive, sortOrder], map: "idx_support_concerns_active_sort")
+  @@map("support_concerns")
+}
+
+model SupportTicket {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketNumber     String                   @unique @map("ticket_number") @db.VarChar(30)
+  concernId        String                   @map("concern_id") @db.Uuid
+  otherConcernText String?                  @map("other_concern_text") @db.VarChar(200)
+  description      String                   @db.Text
+  status           SupportTicketStatusType  @default(open)
+  createdBy        String                   @map("created_by") @db.Uuid
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  concern    SupportConcern            @relation(fields: [concernId], references: [id], onDelete: Restrict)
+  creator    User                      @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  images     SupportTicketImage[]
+  statusLogs SupportTicketStatusLog[]
+
+  @@index([createdBy], map: "idx_support_tickets_created_by")
+  @@index([status], map: "idx_support_tickets_status")
+  @@index([concernId], map: "idx_support_tickets_concern")
+  @@map("support_tickets")
+}
+
+model SupportTicketImage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  imageBlob    Bytes    @map("image_blob")
+  mimeType     String   @map("mime_type") @db.VarChar(50)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId], map: "idx_support_ticket_images_ticket")
+  @@map("support_ticket_images")
+}
+
+model SupportTicketStatusLog {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId       String                  @map("ticket_id") @db.Uuid
+  previousStatus SupportTicketStatusType? @map("previous_status")
+  newStatus      SupportTicketStatusType @map("new_status")
+  changedBy      String                  @map("changed_by") @db.Uuid
+  note           String?                 @db.VarChar(500)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket  SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changer User          @relation(fields: [changedBy], references: [id], onDelete: Restrict)
+
+  @@index([ticketId], map: "idx_support_ticket_status_logs_ticket")
+  @@map("support_ticket_status_logs")
 }

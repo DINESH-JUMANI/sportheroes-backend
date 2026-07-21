@@ -48,6 +48,9 @@ The [Full ERD](./SportHeroes_Full_ERD.mermaid) also shows **optional sport-speci
 | 5 | `add_matches` | `matches`, `match_participants`, `match_sets`, `match_points`, `match_status_logs` |
 | 6 | `add_statistics` | `player_statistics`, `team_statistics` |
 | 7 | `seed_dev_user` | Dev test user for API testing without Firebase |
+| 10 | `team_roles_and_logo_blob` | `admin` value on `team_role_type` |
+| 11 | `sport_specific_rules` | `sport_rules_*` tables + Tennis (5th sport) |
+| 12 | `team_logo_blob` | `teams.logo_blob`, `teams.logo_mime_type` |
 
 ### 2.3 API modules
 
@@ -70,7 +73,8 @@ Docs: `src/modules/auth/AUTH_FLOW.md`, `src/modules/auth/FE_INTEGRATION_GUIDE.md
 | Capability | Status |
 |------------|--------|
 | List / get sports (by ID or code) | ✅ |
-| 4 MVP sports seeded (TT, BAD, VB, PBL) | ✅ |
+| 5 sports seeded (TT, BAD, VB, PBL, TEN) | ✅ |
+| Per-sport rules API (`GET /sports/code/:code/rules`) | ✅ |
 | Per-sport `default_match_format` JSONB | ✅ |
 | Create / list / update / delete player sport profiles | ✅ |
 | Skill level + primary sport flag | ✅ |
@@ -83,15 +87,40 @@ Docs: `src/modules/sports/FE_INTEGRATION_GUIDE.md`
 
 | Capability | Status |
 |------------|--------|
-| Create team (creator becomes captain) | ✅ |
-| List / get teams | ✅ |
-| Update team (name, logo, captain, vice-captain) | ✅ |
-| Soft-delete team | ✅ |
-| Add / update / remove members | ✅ |
-| Roles: captain, vice_captain, member | ✅ |
+| Create team by `sportCode` (creator becomes **admin**) | ✅ |
+| List / get teams (filter by `sportCode`) | ✅ |
+| Update team details + logo blob (admin only) | ✅ |
+| `GET/PUT /teams/:id/logo` — image stored as BYTEA in DB | ✅ |
+| Soft-delete team (admin only) | ✅ |
+| Add members by **phone number** (create placeholder user if needed) | ✅ |
+| Lookup user by phone before add | ✅ |
+| Update member roles (admin only) | ✅ |
+| Remove members (admin or captain) | ✅ |
+| Roles: **admin**, captain, vice_captain, member | ✅ |
 | Team statistics row created on team creation | ✅ |
 
 Docs: `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+
+---
+
+#### Search (`/api/v1/search`)
+
+| Capability | Status |
+|------------|--------|
+| Global case-insensitive search | ✅ |
+| Types: users, teams, tournaments, matches, venues | ✅ |
+
+Docs: `src/modules/search/FE_INTEGRATION_GUIDE.md`
+
+---
+
+#### Sport-specific rules (`/api/v1/sports/code/:code/rules`)
+
+| Capability | Status |
+|------------|--------|
+| Separate rule tables per sport (TT, BAD, VB, PBL, TEN) | ✅ |
+| Per-sport: singles/doubles/team support, captain flags, roster limits | ✅ |
+| Per-sport match format + scoring config | ✅ |
 
 ---
 
@@ -345,6 +374,7 @@ Each backend module has an FE integration guide:
 | Auth | `src/modules/auth/FE_INTEGRATION_GUIDE.md` |
 | Sports | `src/modules/sports/FE_INTEGRATION_GUIDE.md` |
 | Teams | `src/modules/teams/FE_INTEGRATION_GUIDE.md` |
+| Search | `src/modules/search/FE_INTEGRATION_GUIDE.md` |
 | Tournaments | `src/modules/tournaments/FE_INTEGRATION_GUIDE.md` |
 | Matches | `src/modules/matches/FE_INTEGRATION_GUIDE.md` |
 | Statistics | `src/modules/statistics/FE_INTEGRATION_GUIDE.md` |

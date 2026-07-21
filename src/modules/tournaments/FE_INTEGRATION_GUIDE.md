@@ -168,7 +168,7 @@ Typical flow: `draft` → `registration_open` → `registration_closed` → `ong
 **POST** `/api/v1/tournaments/:id/participants`  
 **Auth:** Bearer required
 
-For individual tournaments send `userId`. For team tournaments send `teamId`.
+For individual tournaments send `userId`. For team tournaments send `teamId` (create teams via `src/modules/teams/FE_INTEGRATION_GUIDE.md` — use `sportCode` and phone-based members).
 
 ### Request body (individual)
 
@@ -333,3 +333,11 @@ League/round-robin points table. Updated automatically when tournament matches c
   }
 }
 ```
+
+---
+
+## Related modules
+
+- Teams (team tournaments): `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+- Matches (create tournament matches): `src/modules/matches/FE_INTEGRATION_GUIDE.md`
+- Global search: `src/modules/search/FE_INTEGRATION_GUIDE.md`

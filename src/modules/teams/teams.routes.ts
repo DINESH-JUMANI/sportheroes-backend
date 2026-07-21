@@ -8,8 +8,10 @@ import {
   addMemberSchema,
   createTeamSchema,
   listTeamsQuerySchema,
+  lookupUserQuerySchema,
   updateMemberSchema,
   updateTeamSchema,
+  uploadTeamLogoSchema,
 } from './teams.validators';
 import { z } from 'zod';
 
@@ -20,16 +22,68 @@ const memberIdParamSchema = z.object({
 
 const router = Router();
 
-router.get('/', validate(listTeamsQuerySchema, 'query'), asyncHandler(teamsController.list.bind(teamsController)));
-router.get('/:id', validate(uuidParamSchema, 'params'), asyncHandler(teamsController.getById.bind(teamsController)));
-router.get('/:id/members', validate(uuidParamSchema, 'params'), asyncHandler(teamsController.listMembers.bind(teamsController)));
+router.get(
+  '/',
+  validate(listTeamsQuerySchema, 'query'),
+  asyncHandler(teamsController.list.bind(teamsController)),
+);
+router.get(
+  '/lookup-user',
+  authenticate,
+  validate(lookupUserQuerySchema, 'query'),
+  asyncHandler(teamsController.lookupUser.bind(teamsController)),
+);
+router.get(
+  '/:id',
+  validate(uuidParamSchema, 'params'),
+  asyncHandler(teamsController.getById.bind(teamsController)),
+);
+router.get(
+  '/:id/logo',
+  validate(uuidParamSchema, 'params'),
+  asyncHandler(teamsController.getLogo.bind(teamsController)),
+);
+router.get(
+  '/:id/members',
+  validate(uuidParamSchema, 'params'),
+  asyncHandler(teamsController.listMembers.bind(teamsController)),
+);
 
 router.use(authenticate);
 router.post('/', validate(createTeamSchema), asyncHandler(teamsController.create.bind(teamsController)));
-router.patch('/:id', validate(uuidParamSchema, 'params'), validate(updateTeamSchema), asyncHandler(teamsController.update.bind(teamsController)));
-router.delete('/:id', validate(uuidParamSchema, 'params'), asyncHandler(teamsController.remove.bind(teamsController)));
-router.post('/:id/members', validate(uuidParamSchema, 'params'), validate(addMemberSchema), asyncHandler(teamsController.addMember.bind(teamsController)));
-router.patch('/:id/members/:memberId', validate(memberIdParamSchema, 'params'), validate(updateMemberSchema), asyncHandler(teamsController.updateMember.bind(teamsController)));
-router.delete('/:id/members/:memberId', validate(memberIdParamSchema, 'params'), asyncHandler(teamsController.removeMember.bind(teamsController)));
+router.patch(
+  '/:id',
+  validate(uuidParamSchema, 'params'),
+  validate(updateTeamSchema),
+  asyncHandler(teamsController.update.bind(teamsController)),
+);
+router.put(
+  '/:id/logo',
+  validate(uuidParamSchema, 'params'),
+  validate(uploadTeamLogoSchema),
+  asyncHandler(teamsController.uploadLogo.bind(teamsController)),
+);
+router.delete(
+  '/:id',
+  validate(uuidParamSchema, 'params'),
+  asyncHandler(teamsController.remove.bind(teamsController)),
+);
+router.post(
+  '/:id/members',
+  validate(uuidParamSchema, 'params'),
+  validate(addMemberSchema),
+  asyncHandler(teamsController.addMember.bind(teamsController)),
+);
+router.patch(
+  '/:id/members/:memberId',
+  validate(memberIdParamSchema, 'params'),
+  validate(updateMemberSchema),
+  asyncHandler(teamsController.updateMember.bind(teamsController)),
+);
+router.delete(
+  '/:id/members/:memberId',
+  validate(memberIdParamSchema, 'params'),
+  asyncHandler(teamsController.removeMember.bind(teamsController)),
+);
 
 export default router;

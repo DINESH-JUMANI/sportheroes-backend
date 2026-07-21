@@ -24,6 +24,11 @@ router.get(
   asyncHandler(sportsController.getByCode.bind(sportsController)),
 );
 router.get(
+  '/code/:code/rules',
+  validate(sportCodeParamSchema, 'params'),
+  asyncHandler(sportsController.getRulesByCode.bind(sportsController)),
+);
+router.get(
   '/:id',
   validate(uuidParamSchema, 'params'),
   asyncHandler(sportsController.getById.bind(sportsController)),

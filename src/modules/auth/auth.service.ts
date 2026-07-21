@@ -10,6 +10,7 @@ import { getFirebaseAuth } from '../../config/firebase';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
 import { signAccessToken, signAccessTokenWithDays } from '../../utils/jwt';
 import { Logger } from '../../utils/logger';
+import { mergePlaceholderUserOnLogin } from '../../utils/user-resolver';
 import type { LoginInput, UpdateProfileInput } from './auth.validators';
 import { LoginResult, PublicUser, toPublicUser } from './auth.types';
 
@@ -101,16 +102,25 @@ export class AuthService {
       });
       Logger.info('Existing user logged in', { userId: user.id });
     } else {
-      isNewUser = true;
-      user = await prisma.user.create({
-        data: {
-          firebaseUid,
-          phoneNumber,
-          email,
-          fullName: defaultFullName(phoneNumber, firebaseUid),
-        },
-      });
-      Logger.info('New user created', { userId: user.id, phoneNumber });
+      const merged = await mergePlaceholderUserOnLogin(firebaseUid, phoneNumber);
+      if (merged) {
+        user = await prisma.user.update({
+          where: { id: merged.id },
+          data: { email: email ?? merged.email },
+        });
+        Logger.info('Placeholder user merged on login', { userId: user.id, phoneNumber });
+      } else {
+        isNewUser = true;
+        user = await prisma.user.create({
+          data: {
+            firebaseUid,
+            phoneNumber,
+            email,
+            fullName: defaultFullName(phoneNumber, firebaseUid),
+          },
+        });
+        Logger.info('New user created', { userId: user.id, phoneNumber });
+      }
     }
 
     return {

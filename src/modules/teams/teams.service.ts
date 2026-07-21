@@ -1,31 +1,46 @@
+import type { TeamMember, TeamRoleType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
 import { buildPaginationMeta, getPagination } from '../../utils/pagination';
-import type { AddMemberInput, CreateTeamInput, UpdateMemberInput, UpdateTeamInput } from './teams.validators';
-import { toPublicTeam, toPublicTeamMember } from './teams.types';
+import { findOrCreateUserByPhone, findUserByPhone } from '../../utils/user-resolver';
+import type {
+  AddMemberInput,
+  CreateTeamInput,
+  UpdateMemberInput,
+  UpdateTeamInput,
+  UploadTeamLogoInput,
+} from './teams.validators';
+import { decodeLogoBase64, toPublicTeam, toPublicTeamMember, type PublicUserLookup } from './teams.types';
+
+const teamInclude = {
+  members: {
+    where: { isActive: true },
+    include: { user: true },
+    orderBy: { joinedAt: 'asc' as const },
+  },
+};
 
 export class TeamsService {
   async create(userId: string, input: CreateTeamInput) {
-    const sport = await prisma.sport.findUnique({ where: { id: input.sportId } });
-    if (!sport?.isActive) throw new NotFoundError('Sport not found');
+    const logoBlob = input.logoBase64
+      ? (decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>)
+      : null;
 
     const team = await prisma.$transaction(async (tx) => {
       const created = await tx.team.create({
         data: {
-          sportId: input.sportId,
           name: input.name,
           shortName: input.shortName ?? null,
-          logoUrl: input.logoUrl ?? null,
           description: input.description ?? null,
+          logoBlob,
+          logoMimeType: input.logoMimeType ?? null,
           createdBy: userId,
-          captainId: userId,
         },
-        include: { sport: true },
       });
 
       await tx.teamMember.create({
-        data: { teamId: created.id, userId, role: 'captain' },
+        data: { teamId: created.id, userId, role: 'admin' },
       });
 
       await tx.teamStatistics.create({ data: { teamId: created.id } });
@@ -37,12 +52,9 @@ export class TeamsService {
     return this.getById(team.id);
   }
 
-  async list(page: number, limit: number, sportId?: string, activeOnly = true) {
+  async list(page: number, limit: number, activeOnly = true) {
     const { skip, take } = getPagination({ page, limit });
-    const where = {
-      ...(activeOnly ? { isActive: true } : {}),
-      ...(sportId ? { sportId } : {}),
-    };
+    const where = activeOnly ? { isActive: true } : {};
 
     const [teams, total] = await Promise.all([
       prisma.team.findMany({
@@ -50,7 +62,6 @@ export class TeamsService {
         skip,
         take,
         orderBy: { createdAt: 'desc' },
-        include: { sport: true },
       }),
       prisma.team.count({ where }),
     ]);
@@ -64,106 +75,141 @@ export class TeamsService {
   async getById(id: string) {
     const team = await prisma.team.findUnique({
       where: { id },
-      include: {
-        sport: true,
-        members: {
-          where: { isActive: true },
-          include: { user: true },
-          orderBy: { joinedAt: 'asc' },
-        },
-      },
+      include: teamInclude,
     });
     if (!team || !team.isActive) throw new NotFoundError('Team not found');
     return toPublicTeam(team);
   }
 
   async update(teamId: string, userId: string, input: UpdateTeamInput) {
-    await this.assertCanManage(teamId, userId);
+    await this.assertIsAdmin(teamId, userId);
 
-    if (input.captainId) await this.assertActiveMember(teamId, input.captainId);
-    if (input.viceCaptainId) await this.assertActiveMember(teamId, input.viceCaptainId);
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) data.name = input.name;
+    if (input.shortName !== undefined) data.shortName = input.shortName;
+    if (input.description !== undefined) data.description = input.description;
 
-    const team = await prisma.$transaction(async (tx) => {
-      const updated = await tx.team.update({
-        where: { id: teamId },
-        data: input,
-        include: { sport: true, members: { where: { isActive: true }, include: { user: true } } },
-      });
-
-      if (input.captainId) {
-        await tx.teamMember.updateMany({
-          where: { teamId, role: 'captain', isActive: true },
-          data: { role: 'member' },
-        });
-        await tx.teamMember.updateMany({
-          where: { teamId, userId: input.captainId, isActive: true },
-          data: { role: 'captain' },
-        });
+    if (input.logoBase64 !== undefined) {
+      if (input.logoBase64 === null) {
+        data.logoBlob = null;
+        data.logoMimeType = null;
+      } else {
+        data.logoBlob = decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>;
+        data.logoMimeType = input.logoMimeType;
       }
+    }
 
-      if (input.viceCaptainId) {
-        await tx.teamMember.updateMany({
-          where: { teamId, role: 'vice_captain', isActive: true },
-          data: { role: 'member' },
-        });
-        await tx.teamMember.updateMany({
-          where: { teamId, userId: input.viceCaptainId, isActive: true },
-          data: { role: 'vice_captain' },
-        });
-      }
-
-      return updated;
+    const team = await prisma.team.update({
+      where: { id: teamId },
+      data,
+      include: teamInclude,
     });
 
     Logger.info('Team updated', { teamId });
     return toPublicTeam(team);
   }
 
+  async uploadLogo(teamId: string, userId: string, input: UploadTeamLogoInput) {
+    await this.assertIsAdmin(teamId, userId);
+
+    const team = await prisma.team.update({
+      where: { id: teamId },
+      data: {
+        logoBlob: decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>,
+        logoMimeType: input.logoMimeType,
+      },
+      include: teamInclude,
+    });
+
+    Logger.info('Team logo updated', { teamId });
+    return toPublicTeam(team);
+  }
+
+  async getLogo(teamId: string) {
+    const team = await prisma.team.findUnique({
+      where: { id: teamId, isActive: true },
+      select: { logoBlob: true, logoMimeType: true },
+    });
+    if (!team) throw new NotFoundError('Team not found');
+    if (!team.logoBlob || !team.logoMimeType) throw new NotFoundError('Team has no logo');
+
+    return { buffer: Buffer.from(team.logoBlob), mimeType: team.logoMimeType };
+  }
+
   async softDelete(teamId: string, userId: string) {
     const team = await prisma.team.findUnique({ where: { id: teamId } });
     if (!team || !team.isActive) throw new NotFoundError('Team not found');
-    if (team.createdBy !== userId) throw new ForbiddenError('Only the team creator can delete the team');
+
+    const membership = await this.getActiveMembership(teamId, userId);
+    if (!membership || membership.role !== 'admin') {
+      throw new ForbiddenError('Only team admins can delete the team');
+    }
 
     await prisma.team.update({ where: { id: teamId }, data: { isActive: false } });
     Logger.info('Team deactivated', { teamId });
   }
 
-  async addMember(teamId: string, actorId: string, input: AddMemberInput) {
-    await this.assertCanManage(teamId, actorId);
+  async lookupUserByPhone(phoneNumber: string): Promise<PublicUserLookup> {
+    const user = await findUserByPhone(phoneNumber);
+    if (!user) return { found: false };
 
-    const user = await prisma.user.findUnique({ where: { id: input.userId } });
-    if (!user?.isActive) throw new NotFoundError('User not found');
+    return {
+      found: true,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        displayName: user.displayName,
+        phoneNumber: user.phoneNumber!,
+        profilePictureUrl: user.profilePictureUrl,
+      },
+    };
+  }
+
+  async addMember(teamId: string, actorId: string, input: AddMemberInput) {
+    await this.assertCanManageRoster(teamId, actorId);
+
+    const actorMembership = await this.getActiveMembership(teamId, actorId);
+    if (actorMembership?.role === 'captain' && input.role !== 'member') {
+      throw new ForbiddenError('Captains can only add members with the member role');
+    }
+
+    const user = await findOrCreateUserByPhone({
+      phoneNumber: input.phoneNumber,
+      fullName: input.fullName,
+    });
 
     const existing = await prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId: input.userId } },
+      where: { teamId_userId: { teamId, userId: user.id } },
     });
 
     if (existing?.isActive) throw new BadRequestError('User is already a team member');
 
-    const member = existing
-      ? await prisma.teamMember.update({
-          where: { id: existing.id },
-          data: { isActive: true, role: input.role, leftAt: null, joinedAt: new Date() },
-          include: { user: true },
-        })
-      : await prisma.teamMember.create({
-          data: { teamId, userId: input.userId, role: input.role },
-          include: { user: true },
-        });
+    const member = await prisma.$transaction(async (tx) => {
+      if (input.role === 'captain' || input.role === 'vice_captain') {
+        await this.demoteRoleHolder(tx, teamId, input.role);
+      }
 
-    if (input.role === 'captain') {
-      await prisma.team.update({ where: { id: teamId }, data: { captainId: input.userId } });
-    }
-    if (input.role === 'vice_captain') {
-      await prisma.team.update({ where: { id: teamId }, data: { viceCaptainId: input.userId } });
-    }
+      const created = existing
+        ? await tx.teamMember.update({
+            where: { id: existing.id },
+            data: { isActive: true, role: input.role, leftAt: null, joinedAt: new Date() },
+            include: { user: true },
+          })
+        : await tx.teamMember.create({
+            data: { teamId, userId: user.id, role: input.role },
+            include: { user: true },
+          });
 
-    Logger.info('Team member added', { teamId, userId: input.userId });
+      await this.syncTeamLeadership(tx, teamId, user.id, input.role);
+      return created;
+    });
+
+    Logger.info('Team member added', { teamId, userId: user.id, role: input.role });
     return toPublicTeamMember(member);
   }
 
   async updateMember(teamId: string, memberId: string, actorId: string, input: UpdateMemberInput) {
-    await this.assertCanManage(teamId, actorId);
+    await this.assertIsAdmin(teamId, actorId);
 
     const member = await prisma.teamMember.findFirst({
       where: { id: memberId, teamId, isActive: true },
@@ -171,31 +217,73 @@ export class TeamsService {
     });
     if (!member) throw new NotFoundError('Team member not found');
 
-    const updated = await prisma.teamMember.update({
-      where: { id: memberId },
-      data: input,
-      include: { user: true },
-    });
+    if (input.role) {
+      const adminCount = await prisma.teamMember.count({
+        where: { teamId, role: 'admin', isActive: true },
+      });
+      if (member.role === 'admin' && input.role !== 'admin' && adminCount <= 1) {
+        throw new BadRequestError('Team must have at least one admin');
+      }
+    }
 
-    if (input.role === 'captain') {
-      await prisma.team.update({ where: { id: teamId }, data: { captainId: member.userId } });
-    }
-    if (input.role === 'vice_captain') {
-      await prisma.team.update({ where: { id: teamId }, data: { viceCaptainId: member.userId } });
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      if (input.role && input.role !== member.role) {
+        if (input.role === 'captain' || input.role === 'vice_captain') {
+          await this.demoteRoleHolder(tx, teamId, input.role, member.id);
+        }
+      }
+
+      const result = await tx.teamMember.update({
+        where: { id: memberId },
+        data: input,
+        include: { user: true },
+      });
+
+      if (input.role) {
+        await this.syncTeamLeadership(tx, teamId, member.userId, input.role);
+        if (input.role !== 'captain' && member.role === 'captain') {
+          await tx.team.update({ where: { id: teamId }, data: { captainId: null } });
+        }
+        if (input.role !== 'vice_captain' && member.role === 'vice_captain') {
+          await tx.team.update({ where: { id: teamId }, data: { viceCaptainId: null } });
+        }
+      }
+
+      return result;
+    });
 
     return toPublicTeamMember(updated);
   }
 
   async removeMember(teamId: string, memberId: string, actorId: string) {
-    await this.assertCanManage(teamId, actorId);
+    await this.assertCanManageRoster(teamId, actorId);
 
-    const member = await prisma.teamMember.findFirst({ where: { id: memberId, teamId, isActive: true } });
+    const member = await prisma.teamMember.findFirst({
+      where: { id: memberId, teamId, isActive: true },
+    });
     if (!member) throw new NotFoundError('Team member not found');
 
-    await prisma.teamMember.update({
-      where: { id: memberId },
-      data: { isActive: false, leftAt: new Date() },
+    if (member.role === 'admin') {
+      const adminCount = await prisma.teamMember.count({
+        where: { teamId, role: 'admin', isActive: true },
+      });
+      if (adminCount <= 1) {
+        throw new BadRequestError('Cannot remove the last admin from the team');
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.teamMember.update({
+        where: { id: memberId },
+        data: { isActive: false, leftAt: new Date() },
+      });
+
+      if (member.role === 'captain') {
+        await tx.team.update({ where: { id: teamId }, data: { captainId: null } });
+      }
+      if (member.role === 'vice_captain') {
+        await tx.team.update({ where: { id: teamId }, data: { viceCaptainId: null } });
+      }
     });
 
     Logger.info('Team member removed', { teamId, memberId });
@@ -214,23 +302,76 @@ export class TeamsService {
     return members.map(toPublicTeamMember);
   }
 
-  private async assertCanManage(teamId: string, userId: string) {
+  private async getActiveMembership(teamId: string, userId: string): Promise<TeamMember | null> {
+    return prisma.teamMember.findFirst({
+      where: { teamId, userId, isActive: true },
+    });
+  }
+
+  private async assertIsAdmin(teamId: string, userId: string) {
     const team = await prisma.team.findUnique({ where: { id: teamId } });
     if (!team || !team.isActive) throw new NotFoundError('Team not found');
 
-    const isCaptain = team.captainId === userId || team.createdBy === userId;
-    const member = await prisma.teamMember.findFirst({
-      where: { teamId, userId, isActive: true, role: { in: ['captain', 'vice_captain'] } },
-    });
-
-    if (!isCaptain && !member) {
-      throw new ForbiddenError('Only captain or vice-captain can manage this team');
+    const membership = await this.getActiveMembership(teamId, userId);
+    if (!membership || membership.role !== 'admin') {
+      throw new ForbiddenError('Only team admins can perform this action');
     }
   }
 
-  private async assertActiveMember(teamId: string, userId: string) {
-    const member = await prisma.teamMember.findFirst({ where: { teamId, userId, isActive: true } });
-    if (!member) throw new BadRequestError('User must be an active team member');
+  private async assertCanManageRoster(teamId: string, userId: string) {
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team || !team.isActive) throw new NotFoundError('Team not found');
+
+    const membership = await this.getActiveMembership(teamId, userId);
+    if (!membership || !['admin', 'captain'].includes(membership.role)) {
+      throw new ForbiddenError('Only team admins or captains can manage roster');
+    }
+  }
+
+  private async demoteRoleHolder(
+    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    teamId: string,
+    role: TeamRoleType,
+    excludeMemberId?: string,
+  ) {
+    if (!['captain', 'vice_captain'].includes(role)) return;
+
+    const holders = await tx.teamMember.findMany({
+      where: {
+        teamId,
+        role,
+        isActive: true,
+        ...(excludeMemberId ? { NOT: { id: excludeMemberId } } : {}),
+      },
+    });
+
+    for (const holder of holders) {
+      await tx.teamMember.update({
+        where: { id: holder.id },
+        data: { role: 'member' },
+      });
+    }
+
+    if (role === 'captain') {
+      await tx.team.update({ where: { id: teamId }, data: { captainId: null } });
+    }
+    if (role === 'vice_captain') {
+      await tx.team.update({ where: { id: teamId }, data: { viceCaptainId: null } });
+    }
+  }
+
+  private async syncTeamLeadership(
+    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    teamId: string,
+    userId: string,
+    role: TeamRoleType,
+  ) {
+    if (role === 'captain') {
+      await tx.team.update({ where: { id: teamId }, data: { captainId: userId } });
+    }
+    if (role === 'vice_captain') {
+      await tx.team.update({ where: { id: teamId }, data: { viceCaptainId: userId } });
+    }
   }
 }
 

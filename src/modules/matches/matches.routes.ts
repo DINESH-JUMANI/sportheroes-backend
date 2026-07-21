@@ -6,7 +6,9 @@ import { uuidParamSchema } from '../../utils/pagination';
 import { matchesController } from './matches.controller';
 import {
   cancelMatchSchema,
+  completeMatchSchema,
   createMatchSchema,
+  finishSetSchema,
   listMatchesQuerySchema,
   recordPointSchema,
 } from './matches.validators';
@@ -24,7 +26,8 @@ router.post('/:id/pause', validate(uuidParamSchema, 'params'), asyncHandler(matc
 router.post('/:id/resume', validate(uuidParamSchema, 'params'), asyncHandler(matchesController.resume.bind(matchesController)));
 router.post('/:id/point', validate(uuidParamSchema, 'params'), validate(recordPointSchema), asyncHandler(matchesController.recordPoint.bind(matchesController)));
 router.post('/:id/undo-point', validate(uuidParamSchema, 'params'), asyncHandler(matchesController.undoPoint.bind(matchesController)));
-router.post('/:id/complete', validate(uuidParamSchema, 'params'), asyncHandler(matchesController.complete.bind(matchesController)));
+router.post('/:id/finish-set', validate(uuidParamSchema, 'params'), validate(finishSetSchema), asyncHandler(matchesController.finishSet.bind(matchesController)));
+router.post('/:id/complete', validate(uuidParamSchema, 'params'), validate(completeMatchSchema), asyncHandler(matchesController.complete.bind(matchesController)));
 router.post('/:id/cancel', validate(uuidParamSchema, 'params'), validate(cancelMatchSchema), asyncHandler(matchesController.cancel.bind(matchesController)));
 
 export default router;

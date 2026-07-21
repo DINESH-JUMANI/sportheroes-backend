@@ -139,6 +139,8 @@ Stats for one player. Returns array (one entry per sport played).
           "name": "Mumbai Smashers",
           "shortName": "MSM",
           "logoUrl": null,
+          "hasLogo": true,
+          "logoMimeType": "image/png",
           "sportId": "uuid"
         }
       }
@@ -211,3 +213,12 @@ If team has no completed matches yet:
 | Player profile stats | `GET /statistics/players/:userId?sportId=...` |
 | Team profile stats | `GET /statistics/teams/:teamId` |
 | Team rankings | `GET /statistics/teams/leaderboard?sportId=...` |
+
+Team logos: if `hasLogo` is true, fetch image from `GET /api/v1/teams/:teamId/logo`.
+
+---
+
+## Related modules
+
+- Teams: `src/modules/teams/FE_INTEGRATION_GUIDE.md`
+- Global search: `src/modules/search/FE_INTEGRATION_GUIDE.md`

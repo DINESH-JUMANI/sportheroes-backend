@@ -2,6 +2,8 @@ import { prisma } from '../../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
 import { buildPaginationMeta, getPagination } from '../../utils/pagination';
+import { normalizePhoneNumber } from '../../utils/phone';
+import { resolveUserIdByPhone } from '../../utils/user-resolver';
 import type {
   CreateRoundInput,
   CreateTournamentInput,
@@ -117,8 +119,8 @@ export class TournamentsService {
       throw new BadRequestError('Registration is not open for this tournament');
     }
 
-    if (tournament.participantKind === 'individual' && !input.userId) {
-      throw new BadRequestError('This tournament requires individual registration (userId)');
+    if (tournament.participantKind === 'individual' && !input.phoneNumber) {
+      throw new BadRequestError('This tournament requires individual registration (phoneNumber)');
     }
     if (tournament.participantKind === 'team' && !input.teamId) {
       throw new BadRequestError('This tournament requires team registration (teamId)');
@@ -129,11 +131,19 @@ export class TournamentsService {
       throw new BadRequestError('Tournament is full');
     }
 
+    let resolvedUserId: string | null = null;
+    if (input.phoneNumber) {
+      resolvedUserId = await resolveUserIdByPhone(
+        normalizePhoneNumber(input.phoneNumber),
+        input.fullName,
+      );
+    }
+
     const participant = await prisma.$transaction(async (tx) => {
       const created = await tx.tournamentParticipant.create({
         data: {
           tournamentId,
-          userId: input.userId ?? null,
+          userId: resolvedUserId,
           teamId: input.teamId ?? null,
           seedNumber: input.seedNumber ?? null,
         },
@@ -142,7 +152,7 @@ export class TournamentsService {
       await tx.tournamentStanding.create({
         data: {
           tournamentId,
-          userId: input.userId ?? null,
+          userId: resolvedUserId,
           teamId: input.teamId ?? null,
         },
       });

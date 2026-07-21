@@ -207,7 +207,8 @@
  *           schema:
  *             type: object
  *             properties:
- *               userId: { type: string, format: uuid, description: For individual tournaments }
+ *               phoneNumber: { type: string, example: '+919999999999', description: For individual tournaments }
+ *               fullName: { type: string, description: Required if phone is not registered yet }
  *               teamId: { type: string, format: uuid, description: For team tournaments }
  *               seedNumber: { type: integer }
  *     responses:
@@ -335,4 +336,4 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-export {};
+export { };

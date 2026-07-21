@@ -22,8 +22,18 @@ export class StatisticsService {
       },
     });
 
-    if (!match || match.status !== 'completed' || !match.winnerSide) return;
+    if (!match || match.status !== 'completed' || !match.winnerSide) {
+      Logger.warn('Skipping stats recalc — match not completed or missing winnerSide', {
+        matchId,
+        status: match?.status,
+        winnerSide: match?.winnerSide,
+      });
+      return;
+    }
 
+    // Avoid double-counting if stats were already applied for this match.
+    // We rebuild per-match deltas only once by checking a status-log reason tag is not needed;
+    // callers must ensure complete runs once. For repair, use rebuildAllFromCompletedMatches.
     const winnerSide = match.winnerSide;
     const loserSide = winnerSide === 'A' ? 'B' : 'A';
 
@@ -72,7 +82,39 @@ export class StatisticsService {
       await this.updateTournamentStandings(db, match);
     }
 
-    Logger.info('Statistics recalculated for match', { matchId });
+    Logger.info('Statistics recalculated for match', { matchId, winnerSide });
+  }
+
+  /**
+   * Wipe player/team stats and rebuild from every completed match that has a winner.
+   * Safe to re-run. Use after repairing winner_side on old matches.
+   */
+  async rebuildAllFromCompletedMatches() {
+    await prisma.playerStatistics.deleteMany({});
+    await prisma.teamStatistics.updateMany({
+      data: {
+        matchesPlayed: 0,
+        matchesWon: 0,
+        matchesLost: 0,
+        setsWon: 0,
+        setsLost: 0,
+        winPercentage: 0,
+      },
+    });
+    await prisma.playerSportProfile.updateMany({ data: { rankingPoints: 0 } });
+
+    const completed = await prisma.match.findMany({
+      where: { status: 'completed', winnerSide: { not: null } },
+      select: { id: true },
+      orderBy: { finishedAt: 'asc' },
+    });
+
+    for (const m of completed) {
+      await this.recalculateForMatch(m.id);
+    }
+
+    Logger.info('Rebuilt all statistics from completed matches', { count: completed.length });
+    return { matchesProcessed: completed.length };
   }
 
   private async upsertPlayerStats(
@@ -254,6 +296,7 @@ export class StatisticsService {
               id: true,
               fullName: true,
               displayName: true,
+              phoneNumber: true,
               profilePictureUrl: true,
               city: true,
               country: true,
@@ -276,7 +319,7 @@ export class StatisticsService {
   async getTeamLeaderboard(
     page: number,
     limit: number,
-    sportId?: string,
+    _sportId?: string,
     sortBy = 'win_percentage',
   ) {
     const { skip, take } = getPagination({ page, limit });
@@ -286,9 +329,7 @@ export class StatisticsService {
         ? { matchesPlayed: 'desc' as const }
         : { winPercentage: 'desc' as const };
 
-    const where = sportId
-      ? { team: { sportId, isActive: true } }
-      : { team: { isActive: true } };
+    const where = { team: { isActive: true }, matchesPlayed: { gt: 0 } };
 
     const [stats, total] = await Promise.all([
       prisma.teamStatistics.findMany({
@@ -297,7 +338,16 @@ export class StatisticsService {
         take,
         orderBy,
         include: {
-          team: { select: { id: true, name: true, shortName: true, logoUrl: true, sportId: true } },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              shortName: true,
+              logoUrl: true,
+              logoMimeType: true,
+              logoBlob: true,
+            },
+          },
         },
       }),
       prisma.teamStatistics.count({ where }),
@@ -306,7 +356,16 @@ export class StatisticsService {
     return {
       leaderboard: stats.map((s) => ({
         ...toPublicTeamStatistics(s),
-        team: s.team,
+        team: s.team
+          ? {
+              id: s.team.id,
+              name: s.team.name,
+              shortName: s.team.shortName,
+              logoUrl: s.team.logoUrl,
+              hasLogo: !!s.team.logoBlob && s.team.logoBlob.length > 0,
+              logoMimeType: s.team.logoMimeType,
+            }
+          : null,
       })),
       meta: buildPaginationMeta(page, limit, total),
     };

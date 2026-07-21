@@ -6,6 +6,7 @@ import type {
   MatchStatusLog,
   User,
   Team,
+  Venue,
 } from '@prisma/client';
 
 export interface PublicMatchParticipant {
@@ -14,7 +15,7 @@ export interface PublicMatchParticipant {
   userId: string | null;
   teamId: string | null;
   isWinner: boolean;
-  user?: { id: string; fullName: string; displayName: string | null };
+  user?: { id: string; fullName: string; displayName: string | null; phoneNumber: string | null };
   team?: { id: string; name: string };
 }
 
@@ -42,11 +43,21 @@ export interface PublicMatchPoint {
 export interface PublicMatch {
   id: string;
   sportId: string;
+  sport?: { id: string; name: string; code: string };
   tournamentId: string | null;
   tournamentRoundId: string | null;
   matchType: string;
   matchFormat: Record<string, unknown>;
   venue: string | null;
+  venueId: string | null;
+  venueDetails?: {
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    address: string | null;
+    city: string | null;
+  } | null;
   scheduledAt: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -64,6 +75,8 @@ type MatchWithRelations = Match & {
   sets?: MatchSet[];
   points?: MatchPoint[];
   statusLogs?: MatchStatusLog[];
+  venueRef?: Venue | null;
+  sport?: { id: string; name: string; code: string } | null;
 };
 
 export function toPublicMatchParticipant(
@@ -76,7 +89,12 @@ export function toPublicMatchParticipant(
     teamId: p.teamId,
     isWinner: p.isWinner,
     user: p.user
-      ? { id: p.user.id, fullName: p.user.fullName, displayName: p.user.displayName }
+      ? {
+          id: p.user.id,
+          fullName: p.user.fullName,
+          displayName: p.user.displayName,
+          phoneNumber: p.user.phoneNumber,
+        }
       : undefined,
     team: p.team ? { id: p.team.id, name: p.team.name } : undefined,
   };
@@ -111,11 +129,25 @@ export function toPublicMatch(match: MatchWithRelations): PublicMatch {
   return {
     id: match.id,
     sportId: match.sportId,
+    sport: match.sport
+      ? { id: match.sport.id, name: match.sport.name, code: match.sport.code }
+      : undefined,
     tournamentId: match.tournamentId,
     tournamentRoundId: match.tournamentRoundId,
     matchType: match.matchType,
     matchFormat: match.matchFormat as Record<string, unknown>,
     venue: match.venue,
+    venueId: match.venueId,
+    venueDetails: match.venueRef
+      ? {
+          id: match.venueRef.id,
+          name: match.venueRef.name,
+          latitude: match.venueRef.latitude,
+          longitude: match.venueRef.longitude,
+          address: match.venueRef.address,
+          city: match.venueRef.city,
+        }
+      : null,
     scheduledAt: match.scheduledAt?.toISOString() ?? null,
     startedAt: match.startedAt?.toISOString() ?? null,
     finishedAt: match.finishedAt?.toISOString() ?? null,

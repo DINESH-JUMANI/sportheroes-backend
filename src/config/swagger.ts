@@ -46,6 +46,9 @@ SportHeroes backend REST API.
       { name: 'Tournaments', description: 'Tournament management' },
       { name: 'Matches', description: 'Match lifecycle and live scoring' },
       { name: 'Statistics', description: 'Player and team statistics & leaderboards' },
+      { name: 'Search', description: 'Global search across users, teams, tournaments, matches, venues' },
+      { name: 'Venues', description: 'Venue management with GPS location' },
+      { name: 'Support', description: 'Help & support concerns and tickets' },
     ],
   },
   apis: [
@@ -57,6 +60,9 @@ SportHeroes backend REST API.
     './src/docs/swagger.tournaments.paths.ts',
     './src/docs/swagger.matches.paths.ts',
     './src/docs/swagger.statistics.paths.ts',
+    './src/docs/swagger.search.paths.ts',
+    './src/docs/swagger.venues.paths.ts',
+    './src/docs/swagger.support.paths.ts',
   ],
 };
 

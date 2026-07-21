@@ -21,6 +21,18 @@ export function parseMatchFormat(value: unknown): MatchFormat {
   return format;
 }
 
+/** Override sport defaults with FE-chosen best-of (1–5). sets_to_win = ceil(bestOf/2). */
+export function applyBestOfSets(defaultFormat: MatchFormat, bestOfSets: number): MatchFormat {
+  if (!Number.isInteger(bestOfSets) || bestOfSets < 1 || bestOfSets > 5) {
+    throw new Error('bestOfSets must be an integer from 1 to 5');
+  }
+  return {
+    ...defaultFormat,
+    best_of_sets: bestOfSets,
+    sets_to_win: Math.ceil(bestOfSets / 2),
+  };
+}
+
 export function isSetWon(
   sideAScore: number,
   sideBScore: number,

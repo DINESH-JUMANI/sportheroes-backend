@@ -126,3 +126,10 @@ Same shape as my profiles.
 1. `GET /api/v1/sports` → sport picker
 2. User selects sports → `POST /api/v1/player-profiles` for each
 3. Home → `GET /api/v1/player-profiles/me`
+
+---
+
+## Related modules
+
+- Sports list & rules: `src/modules/sports/FE_INTEGRATION_GUIDE.md`
+- Global search (find players by name/phone): `src/modules/search/FE_INTEGRATION_GUIDE.md`
