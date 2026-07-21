@@ -40,7 +40,10 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
+  },
+  "overrides": {
+    "jose": "4.15.9"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

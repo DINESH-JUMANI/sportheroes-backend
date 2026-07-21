@@ -450,6 +450,8 @@ Examples:
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
+| `ERR_REQUIRE_ESM` involving `jose` / `jwks-rsa` | ESM-only `jose@6` with CommonJS on Vercel | Keep `package.json` `overrides.jose` at `4.15.9` and redeploy |
+| Browser shows Vercel **Login** page | Deployment Protection enabled | Vercel → Settings → Deployment Protection → turn off for Production (public API) |
 | `/health` → database disconnected | Bad `DATABASE_URL`, using direct URL without allowing Vercel, or wrong password | Use **Transaction pooler** + `pgbouncer=true`; URL-encode password |
 | `prisma: command not found` on build | `prisma` only in devDependencies | Move `prisma` to `dependencies`; ensure `postinstall` / `vercel-build` runs `prisma generate` |
 | Missing Prisma engine / query engine errors | Wrong binary target | Add `rhel-openssl-3.0.x` to `binaryTargets`, regenerate, redeploy |
