@@ -2,6 +2,7 @@ import type { User } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError } from './errors';
 import { isPlaceholderFirebaseUid, normalizePhoneNumber, placeholderFirebaseUid } from './phone';
+import { ensureUserLinkedToAllSports } from './user-sports';
 
 export interface ResolveUserByPhoneInput {
   phoneNumber: string;
@@ -29,13 +30,16 @@ export async function findOrCreateUserByPhone(input: ResolveUserByPhoneInput): P
     );
   }
 
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       firebaseUid: placeholderFirebaseUid(phoneNumber),
       phoneNumber,
       fullName: input.fullName.trim(),
     },
   });
+
+  await ensureUserLinkedToAllSports(user.id);
+  return user;
 }
 
 export async function findUserByPhone(phoneNumber: string): Promise<User | null> {

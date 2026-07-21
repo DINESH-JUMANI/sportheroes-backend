@@ -11,6 +11,7 @@ import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } fro
 import { signAccessToken, signAccessTokenWithDays } from '../../utils/jwt';
 import { Logger } from '../../utils/logger';
 import { mergePlaceholderUserOnLogin } from '../../utils/user-resolver';
+import { ensureUserLinkedToAllSports } from '../../utils/user-sports';
 import type { LoginInput, UpdateProfileInput } from './auth.validators';
 import { LoginResult, PublicUser, toPublicUser } from './auth.types';
 
@@ -123,6 +124,9 @@ export class AuthService {
       }
     }
 
+    // Link to every active sport (idempotent — covers new users + newly added sports)
+    await ensureUserLinkedToAllSports(user.id);
+
     return {
       isNewUser,
       user: toPublicUser(user),
@@ -209,6 +213,8 @@ export class AuthService {
     }
 
     Logger.info('Dev login issued', { userId: user.id, expiryDays: DEV_TOKEN_EXPIRY_DAYS });
+
+    await ensureUserLinkedToAllSports(user.id);
 
     return {
       isNewUser: false,
