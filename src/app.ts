@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import swaggerUi from 'swagger-ui-express';
 import { config } from './config/config';
 import { prisma } from './config/prisma';
 import { swaggerSpec } from './config/swagger';
@@ -25,7 +24,40 @@ app.use(express.json());
 app.use(requestLogger);
 
 if (config.swagger.enabled) {
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // CDN-based Swagger UI — local swagger-ui-dist assets break on Vercel serverless
+  // (JS requests get HTML and fail with "Unexpected token '<'").
+  const swaggerHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SportHeroes API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+  <style>body { margin: 0; background: #fafafa; } #swagger-ui { max-width: 100%; }</style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" crossorigin></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" crossorigin></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: '/api/docs.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: 'StandaloneLayout',
+        persistAuthorization: true,
+      });
+    };
+  </script>
+</body>
+</html>`;
+
+  app.get(['/api/docs', '/api/docs/'], (_req: Request, res: Response) => {
+    res.type('html').send(swaggerHtml);
+  });
+
   app.get('/api/docs.json', (_req: Request, res: Response) => {
     res.json(swaggerSpec);
   });
@@ -42,7 +74,7 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/venues', venuesRoutes);
 app.use('/api/v1/support', supportRoutes);
 
-app.get('/health', async (_req: Request, res: Response) => {
+app.get(['/health', '/api/health'], async (_req: Request, res: Response) => {
   let dbConnected = false;
 
   try {
