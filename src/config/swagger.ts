@@ -1,5 +1,8 @@
+import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { config } from './config';
+
+const docsDir = path.join(process.cwd(), 'src', 'docs');
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -22,6 +25,10 @@ SportHeroes backend REST API.
       `.trim(),
     },
     servers: [
+      {
+        url: '/',
+        description: 'Current host (local or Vercel)',
+      },
       {
         url: `http://localhost:${config.port}`,
         description: 'Local development',
@@ -52,17 +59,17 @@ SportHeroes backend REST API.
     ],
   },
   apis: [
-    './src/docs/swagger.components.ts',
-    './src/docs/swagger.auth.paths.ts',
-    './src/docs/swagger.sports.paths.ts',
-    './src/docs/swagger.players.paths.ts',
-    './src/docs/swagger.teams.paths.ts',
-    './src/docs/swagger.tournaments.paths.ts',
-    './src/docs/swagger.matches.paths.ts',
-    './src/docs/swagger.statistics.paths.ts',
-    './src/docs/swagger.search.paths.ts',
-    './src/docs/swagger.venues.paths.ts',
-    './src/docs/swagger.support.paths.ts',
+    path.join(docsDir, 'swagger.components.ts'),
+    path.join(docsDir, 'swagger.auth.paths.ts'),
+    path.join(docsDir, 'swagger.sports.paths.ts'),
+    path.join(docsDir, 'swagger.players.paths.ts'),
+    path.join(docsDir, 'swagger.teams.paths.ts'),
+    path.join(docsDir, 'swagger.tournaments.paths.ts'),
+    path.join(docsDir, 'swagger.matches.paths.ts'),
+    path.join(docsDir, 'swagger.statistics.paths.ts'),
+    path.join(docsDir, 'swagger.search.paths.ts'),
+    path.join(docsDir, 'swagger.venues.paths.ts'),
+    path.join(docsDir, 'swagger.support.paths.ts'),
   ],
 };
 
