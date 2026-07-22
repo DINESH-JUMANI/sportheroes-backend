@@ -6,171 +6,98 @@
 
 ## What changed in this round
 
-1. **Supabase Auth / phone OTP removed** — auth is **email or phone + password** only  
-2. **Supabase is Storage-only** (avatars, team logos, support images)  
-3. **Placeholder users** (added via teams/matches) use **`POST /auth/set-password`** then get a JWT  
+**User search typeahead** for match (and team) participant pickers — so the user can find someone by typing part of a **name**, **phone**, or **email** instead of entering the full phone number every time.
 
 ---
 
-## Remove from FE
+## New API — Search users
 
-- Firebase (already gone)  
-- Supabase Auth / OTP / `signInWithOtp` / sending Supabase `accessToken` to `/auth/login`  
-- Keep Supabase **only if** you upload files client-side; otherwise just use our multipart upload APIs  
+**GET** `/api/v1/search/users`
 
----
+| | |
+|--|--|
+| Auth | `Authorization: Bearer <app JWT>` **required** |
+| Purpose | Typeahead while creating a match / adding a participant |
 
-## Auth APIs
+### Query params
 
-All success/error responses still use `{ success, message, data }`.
+| Param | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `q` | yes | — | Search text (min 1 char). Matches **fullName**, **displayName**, **phoneNumber**, **email** (case-insensitive, partial). Digit fragments also match phone (e.g. `9999` → `+919999…`). |
+| `page` | no | `1` | Pagination |
+| `limit` | no | `15` | Max `50` |
 
-### Register
+### Examples
 
-**POST** `/api/v1/auth/register`
-
-```json
-{
-  "email": "user@example.com",
-  "phoneNumber": "+919000000001",
-  "password": "Secret123!",
-  "fullName": "Jane Doe"
-}
+```
+GET /api/v1/search/users?q=rahul
+GET /api/v1/search/users?q=9999
+GET /api/v1/search/users?q=jane@
+GET /api/v1/search/users?q=%2B919&limit=10
 ```
 
-Need **at least one** of `email` / `phoneNumber`. Returns `data.tokens.accessToken` (app JWT).
-
-### Check account (login step 1)
-
-**POST** `/api/v1/auth/check` — public, no token
-
-```json
-{ "email": "user@example.com" }
-```
-
-or
-
-```json
-{ "phoneNumber": "+919000000001" }
-```
-
-Response:
+### Success response `200`
 
 ```json
 {
   "success": true,
-  "message": "Account check completed",
-  "data": { "exists": true, "hasPassword": true }
+  "message": "Users found",
+  "data": {
+    "users": [
+      {
+        "id": "uuid",
+        "fullName": "Rahul Sharma",
+        "displayName": "Rahul",
+        "phoneNumber": "+919999999999",
+        "email": "rahul@example.com",
+        "profilePictureUrl": "https://…/avatar.jpg",
+        "city": "Mumbai"
+      }
+    ],
+    "meta": {
+      "page": 1,
+      "limit": 15,
+      "total": 1,
+      "totalPages": 1,
+      "query": "rahul"
+    }
+  }
 }
 ```
 
-| `exists` | `hasPassword` | FE action |
-|----------|---------------|-----------|
-| `false` | any | → Register (prefill email/phone) |
-| `true` | `false` | → Set password screen |
-| `true` | `true` | → Show password field (login step 2) |
+Empty list when nothing matches: `data.users: []` (still `200`).
 
-### Login (email **or** phone)
+### Errors
 
-**POST** `/api/v1/auth/login`
-
-```json
-{ "email": "user@example.com", "password": "Secret123!" }
-```
-
-or
-
-```json
-{ "phoneNumber": "+919000000001", "password": "Secret123!" }
-```
-
-### Placeholder users (no password yet)
-
-If login returns:
-
-```json
-{
-  "success": false,
-  "message": "Password is not set for this account. Use POST /auth/set-password to create one.",
-  "error": { "code": "PASSWORD_NOT_SET" }
-}
-```
-
-Then call:
-
-**POST** `/api/v1/auth/set-password`
-
-```json
-{
-  "phoneNumber": "+919000000001",
-  "password": "Secret123!",
-  "fullName": "Optional name update"
-}
-```
-
-→ returns JWT. User can login normally after that.
-
-### Reset password (knows current password — no OTP)
-
-**POST** `/api/v1/auth/reset-password`
-
-```json
-{
-  "email": "user@example.com",
-  "currentPassword": "OldSecret1!",
-  "newPassword": "NewSecret1!"
-}
-```
-
-### Change password (logged in)
-
-**POST** `/api/v1/auth/change-password`  
-`Authorization: Bearer <app JWT>`
-
-```json
-{ "currentPassword": "OldSecret1!", "newPassword": "NewSecret1!" }
-```
-
-### FE login screen flow
-
-1. User enters email **or** phone + password → `POST /login`  
-2. If `PASSWORD_NOT_SET` → show “Create password” → `POST /set-password`  
-3. If user not found → register screen → `POST /register`  
-4. Store **`data.tokens.accessToken`** for all other APIs  
-
-`user.hasPassword` on `/auth/me` is `false` until password is set.
+| Status | When |
+|--------|------|
+| `400` | Missing / empty `q` |
+| `401` | No / invalid JWT |
 
 ---
 
-## Images (unchanged — Supabase Storage via our API)
+## Suggested FE flow (create match)
 
-| Action | Endpoint | Body |
-|--------|----------|------|
-| Avatar | `POST /auth/avatar` | multipart `file` |
-| Team logo | `PUT /teams/:id/logo` | multipart `file` |
-| Support image | `POST /support/upload-image` | multipart `file` → `{ url }` |
+1. User focuses participant field → as they type, **debounce ~300ms** → call `GET /search/users?q=…`.
+2. Show dropdown from `data.users` (name + phone + avatar).
+3. **If user selects a row** → use that `phoneNumber` (and optionally `fullName`) in `POST /matches` participant payload (same as today).
+4. **If no results / new person** → keep current UX: enter full phone (+ name if new) and create match; backend still creates a placeholder user when needed.
+
+Match create participant shape is unchanged:
+
+```json
+{
+  "side": "A",
+  "phoneNumber": "+919999999999",
+  "fullName": "Rahul Sharma"
+}
+```
+
+`fullName` is only needed when the phone is **new** (placeholder user). If they picked an existing user from search, you can still send `fullName` or omit it — existing users are resolved by phone.
 
 ---
 
-## Match scorer (still applies)
+## Related (unchanged)
 
-Only `match.startedBy` can score/pause/resume/finish. Drop FE-local scorer storage.
-
----
-
-## Backend setup you need
-
-```bash
-npm run db:migrate:17
-npx prisma generate
-```
-
-`.env` — Storage only (no phone auth product needed):
-
-```env
-SUPABASE_URL=...
-SUPABASE_SERVICE_ROLE_KEY=...   # storage uploads
-```
-
-Buckets still: `avatars`, `team-logos`, `support-tickets` (public read).
-
-Dev: `POST /auth/dev-login` (sets password `DevPass123!` on seed user if missing).
+- Global search (home bar): `GET /api/v1/search?q=…&types=users,teams,…` (public, generic result cards).
+- Prefer **`/search/users`** for match/team participant pickers — richer user fields + auth.

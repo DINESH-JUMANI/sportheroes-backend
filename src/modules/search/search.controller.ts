@@ -7,6 +7,11 @@ export class SearchController {
     const result = await searchService.search(req.query as never);
     sendSuccess(res, 'Search completed', result);
   }
+
+  async searchUsers(req: Request, res: Response): Promise<void> {
+    const result = await searchService.searchUsers(req.query as never);
+    sendSuccess(res, 'Users found', result);
+  }
 }
 
 export const searchController = new SearchController();

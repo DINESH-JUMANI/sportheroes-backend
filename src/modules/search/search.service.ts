@@ -1,9 +1,77 @@
 import { prisma } from '../../config/prisma';
 import { buildPaginationMeta, getPagination } from '../../utils/pagination';
-import type { SearchQuery } from './search.validators';
-import type { SearchResponse, SearchResultItem } from './search.types';
+import type { SearchQuery, SearchUsersQuery } from './search.validators';
+import type {
+  SearchResponse,
+  SearchResultItem,
+  UserSearchItem,
+  UserSearchResponse,
+} from './search.types';
 
 export class SearchService {
+  /**
+   * Typeahead search for users by name, phone, or email.
+   * Digits in `q` also match phone substrings (e.g. "9999" → +919999…).
+   */
+  async searchUsers(query: SearchUsersQuery): Promise<UserSearchResponse> {
+    const { q, page, limit } = query;
+    const { skip, take } = getPagination({ page, limit });
+    const digits = q.replace(/\D/g, '');
+
+    const orFilters: Array<Record<string, unknown>> = [
+      { fullName: { contains: q, mode: 'insensitive' } },
+      { displayName: { contains: q, mode: 'insensitive' } },
+      { email: { contains: q, mode: 'insensitive' } },
+      { phoneNumber: { contains: q, mode: 'insensitive' } },
+    ];
+
+    if (digits.length >= 3 && digits !== q) {
+      orFilters.push({ phoneNumber: { contains: digits } });
+    }
+
+    const where = {
+      isActive: true,
+      OR: orFilters,
+    };
+
+    const [rows, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [{ fullName: 'asc' }],
+        select: {
+          id: true,
+          fullName: true,
+          displayName: true,
+          phoneNumber: true,
+          email: true,
+          profilePictureUrl: true,
+          city: true,
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const users: UserSearchItem[] = rows.map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      displayName: u.displayName,
+      phoneNumber: u.phoneNumber,
+      email: u.email,
+      profilePictureUrl: u.profilePictureUrl,
+      city: u.city,
+    }));
+
+    return {
+      users,
+      meta: {
+        ...buildPaginationMeta(page, limit, total),
+        query: q,
+      },
+    };
+  }
+
   async search(query: SearchQuery): Promise<SearchResponse> {
     const { q, types, page, limit } = query;
     const typeSet = new Set(types);

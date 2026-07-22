@@ -18,4 +18,11 @@ export const searchQuerySchema = paginationSchema.extend({
     }),
 });
 
+/** Typeahead for match/team participant pickers — name, phone, or email. */
+export const searchUsersQuerySchema = paginationSchema.extend({
+  q: z.string().trim().min(1).max(100),
+  limit: z.coerce.number().int().min(1).max(50).default(15),
+});
+
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
+export type SearchUsersQuery = z.infer<typeof searchUsersQuerySchema>;

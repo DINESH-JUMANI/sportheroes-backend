@@ -55,6 +55,34 @@
  *                         types: { type: array, items: { type: string } }
  *       400:
  *         $ref: '#/components/responses/BadRequest'
+ *
+ * /api/v1/search/users:
+ *   get:
+ *     tags: [Search]
+ *     summary: Search users by name, phone, or email (typeahead)
+ *     description: |
+ *       Authenticated endpoint for match/team participant pickers.
+ *       Partial match on fullName, displayName, phoneNumber, and email.
+ *       Digit-only fragments also match phone (e.g. `q=9999`).
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema: { type: string, example: rahul }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 15, maximum: 50 }
+ *     responses:
+ *       200:
+ *         description: Matching users
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
  */
 
 export {};
