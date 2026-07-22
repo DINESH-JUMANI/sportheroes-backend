@@ -14,14 +14,12 @@ const options: swaggerJsdoc.Options = {
 SportHeroes backend REST API.
 
 **Authentication**
-- Production: Firebase Phone Auth → \`POST /api/v1/auth/login\` with Firebase \`idToken\`
-- Development: Run \`npm run db:seed:dev\` then \`POST /api/v1/auth/dev-login\` for a 1-year JWT
+- Email or phone + password → \`POST /api/v1/auth/register\` / \`POST /api/v1/auth/login\`
+- Placeholder users (teams/matches): \`POST /api/v1/auth/set-password\` then login
+- Development: \`POST /api/v1/auth/dev-login\` for a 1-year JWT
 
-**Swagger testing**
-1. Run \`npm run db:seed:dev\`
-2. Call \`POST /api/v1/auth/dev-login\`
-3. Copy \`data.tokens.accessToken\`
-4. Click **Authorize** → paste token (no "Bearer " prefix needed in Swagger UI)
+**Storage**
+- Images upload via multipart to our API; files stored in **Supabase Storage** (not Supabase Auth)
       `.trim(),
     },
     servers: [
@@ -41,12 +39,12 @@ SportHeroes backend REST API.
           scheme: 'bearer',
           bearerFormat: 'JWT',
           description:
-            'App JWT from POST /api/v1/auth/login or POST /api/v1/auth/dev-login (dev only)',
+            'App JWT from POST /api/v1/auth/login, /register, /set-password, or /dev-login',
         },
       },
     },
     tags: [
-      { name: 'Auth', description: 'Authentication (Firebase + dev login)' },
+      { name: 'Auth', description: 'Email/phone + password auth (app JWT)' },
       { name: 'Sports', description: 'Sports master data (CRUD)' },
       { name: 'Players', description: 'Player sport profiles' },
       { name: 'Teams', description: 'Team management' },

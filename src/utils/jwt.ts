@@ -5,8 +5,8 @@ import { Logger } from './logger';
 
 export interface JwtPayload {
   sub: string;
-  firebaseUid: string;
   phoneNumber?: string | null;
+  email?: string | null;
 }
 
 export interface SignedToken {
@@ -52,10 +52,12 @@ export function verifyAccessToken(token: string): JwtPayload {
       throw new UnauthorizedError('Invalid access token');
     }
 
+    const payload = decoded as JwtPayload;
+
     return {
       sub: decoded.sub,
-      firebaseUid: (decoded as JwtPayload).firebaseUid,
-      phoneNumber: (decoded as JwtPayload).phoneNumber,
+      phoneNumber: payload.phoneNumber,
+      email: payload.email,
     };
   } catch (error) {
     if (error instanceof UnauthorizedError) throw error;

@@ -11,15 +11,15 @@ declare global {
       user?: User;
       tokenPayload?: {
         sub: string;
-        firebaseUid: string;
         phoneNumber?: string | null;
+        email?: string | null;
       };
     }
   }
 }
 
 /**
- * Requires a valid Bearer access token and attaches the user to the request.
+ * Requires a valid Bearer access token (app JWT) and attaches the user to the request.
  */
 export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {

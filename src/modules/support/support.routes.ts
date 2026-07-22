@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
+import { imageUpload } from '../../middleware/upload.middleware';
 import { validate } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 import { uuidParamSchema } from '../../utils/pagination';
@@ -35,6 +36,12 @@ router.get(
 );
 
 router.use(authenticate);
+
+router.post(
+  '/upload-image',
+  imageUpload.single('file'),
+  asyncHandler(supportController.uploadImage.bind(supportController)),
+);
 
 router.post(
   '/concerns',

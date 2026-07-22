@@ -9,9 +9,9 @@ import type {
   CreateTeamInput,
   UpdateMemberInput,
   UpdateTeamInput,
-  UploadTeamLogoInput,
 } from './teams.validators';
-import { decodeLogoBase64, toPublicTeam, toPublicTeamMember, type PublicUserLookup } from './teams.types';
+import { toPublicTeam, toPublicTeamMember, type PublicUserLookup } from './teams.types';
+import { extensionForMime, uploadToSupabase } from '../../utils/storage';
 
 const teamInclude = {
   members: {
@@ -23,18 +23,12 @@ const teamInclude = {
 
 export class TeamsService {
   async create(userId: string, input: CreateTeamInput) {
-    const logoBlob = input.logoBase64
-      ? (decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>)
-      : null;
-
     const team = await prisma.$transaction(async (tx) => {
       const created = await tx.team.create({
         data: {
           name: input.name,
           shortName: input.shortName ?? null,
           description: input.description ?? null,
-          logoBlob,
-          logoMimeType: input.logoMimeType ?? null,
           createdBy: userId,
         },
       });
@@ -88,14 +82,11 @@ export class TeamsService {
     if (input.name !== undefined) data.name = input.name;
     if (input.shortName !== undefined) data.shortName = input.shortName;
     if (input.description !== undefined) data.description = input.description;
-
-    if (input.logoBase64 !== undefined) {
-      if (input.logoBase64 === null) {
+    if (input.logoUrl !== undefined) {
+      data.logoUrl = input.logoUrl;
+      if (input.logoUrl === null) {
         data.logoBlob = null;
         data.logoMimeType = null;
-      } else {
-        data.logoBlob = decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>;
-        data.logoMimeType = input.logoMimeType;
       }
     }
 
@@ -109,28 +100,45 @@ export class TeamsService {
     return toPublicTeam(team);
   }
 
-  async uploadLogo(teamId: string, userId: string, input: UploadTeamLogoInput) {
+  /** Upload logo file to Supabase Storage and store public URL. */
+  async uploadLogo(teamId: string, userId: string, file: Express.Multer.File) {
     await this.assertIsAdmin(teamId, userId);
+
+    const path = `teams/${teamId}/logo.${extensionForMime(file.mimetype)}`;
+    const logoUrl = await uploadToSupabase({
+      bucket: 'team-logos',
+      path,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      upsert: true,
+    });
 
     const team = await prisma.team.update({
       where: { id: teamId },
       data: {
-        logoBlob: decodeLogoBase64(input.logoBase64) as Uint8Array<ArrayBuffer>,
-        logoMimeType: input.logoMimeType,
+        logoUrl,
+        logoMimeType: file.mimetype,
+        logoBlob: null,
       },
       include: teamInclude,
     });
 
-    Logger.info('Team logo updated', { teamId });
+    Logger.info('Team logo uploaded to Supabase', { teamId });
     return toPublicTeam(team);
   }
 
-  async getLogo(teamId: string) {
+  async getLogo(teamId: string): Promise<
+    { redirectUrl: string } | { buffer: Buffer; mimeType: string }
+  > {
     const team = await prisma.team.findUnique({
       where: { id: teamId, isActive: true },
-      select: { logoBlob: true, logoMimeType: true },
+      select: { logoUrl: true, logoBlob: true, logoMimeType: true },
     });
     if (!team) throw new NotFoundError('Team not found');
+
+    if (team.logoUrl) {
+      return { redirectUrl: team.logoUrl };
+    }
     if (!team.logoBlob || !team.logoMimeType) throw new NotFoundError('Team has no logo');
 
     return { buffer: Buffer.from(team.logoBlob), mimeType: team.logoMimeType };

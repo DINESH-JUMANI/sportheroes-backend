@@ -4,7 +4,6 @@ dotenv.config();
 
 import app from './app';
 import { assertConfig, config } from './config/config';
-import { initFirebase } from './config/firebase';
 import { prisma } from './config/prisma';
 import { Logger } from './utils/logger';
 
@@ -12,7 +11,6 @@ async function bootstrap() {
   Logger.info('Initializing Sport Heroes backend...');
 
   assertConfig();
-  initFirebase();
 
   try {
     await prisma.$queryRaw`SELECT 1`;

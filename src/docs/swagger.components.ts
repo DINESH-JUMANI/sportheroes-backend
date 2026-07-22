@@ -91,8 +91,6 @@
  *         id:
  *           type: string
  *           format: uuid
- *         firebaseUid:
- *           type: string
  *         email:
  *           type: string
  *           nullable: true
@@ -101,6 +99,9 @@
  *           nullable: true
  *         fullName:
  *           type: string
+ *         hasPassword:
+ *           type: boolean
+ *           description: false until set-password for placeholder users
  *         displayName:
  *           type: string
  *           nullable: true

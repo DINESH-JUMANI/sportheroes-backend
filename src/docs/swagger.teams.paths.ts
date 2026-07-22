@@ -32,11 +32,9 @@
  *               name: { type: string, example: Mumbai Smashers }
  *               shortName: { type: string, example: MSM }
  *               description: { type: string }
- *               logoBase64: { type: string, description: Base64-encoded image }
- *               logoMimeType: { type: string, enum: [image/jpeg, image/png, image/webp, image/gif] }
  *     responses:
  *       201:
- *         description: Team created
+ *         description: Team created — upload logo via PUT /teams/{id}/logo
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *
@@ -86,8 +84,7 @@
  *               name: { type: string }
  *               shortName: { type: string }
  *               description: { type: string }
- *               logoBase64: { type: string, nullable: true }
- *               logoMimeType: { type: string, nullable: true }
+ *               logoUrl: { type: string, nullable: true, description: Prefer PUT /logo multipart }
  *     responses:
  *       200:
  *         description: Updated
@@ -109,23 +106,22 @@
  * /api/v1/teams/{id}/logo:
  *   get:
  *     tags: [Teams]
- *     summary: Get team logo image (blob)
+ *     summary: Get team logo (redirects to Supabase Storage URL when set)
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema: { type: string, format: uuid }
  *     responses:
+ *       302:
+ *         description: Redirect to public Storage URL
  *       200:
- *         description: Image binary
- *         content:
- *           image/*:
- *             schema: { type: string, format: binary }
+ *         description: Legacy blob image
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *   put:
  *     tags: [Teams]
- *     summary: Upload team logo (admin only)
+ *     summary: Upload team logo to Supabase Storage (admin only)
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
@@ -135,16 +131,17 @@
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [logoBase64, logoMimeType]
+ *             required: [file]
  *             properties:
- *               logoBase64: { type: string }
- *               logoMimeType: { type: string, enum: [image/jpeg, image/png, image/webp, image/gif] }
+ *               file:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
- *         description: Logo updated
+ *         description: Logo updated — team.logoUrl is the public URL
  *
  * /api/v1/teams/{id}/members:
  *   get:

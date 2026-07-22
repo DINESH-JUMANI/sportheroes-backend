@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { sendSuccess } from '../../utils/api-response';
+import { BadRequestError } from '../../utils/errors';
 import { teamsService } from './teams.service';
 
 export class TeamsController {
@@ -29,15 +30,22 @@ export class TeamsController {
   }
 
   async uploadLogo(req: Request, res: Response): Promise<void> {
-    const team = await teamsService.uploadLogo(req.params.id, req.user!.id, req.body);
+    if (!req.file) {
+      throw new BadRequestError('file is required (multipart field name: file)');
+    }
+    const team = await teamsService.uploadLogo(req.params.id, req.user!.id, req.file);
     sendSuccess(res, 'Team logo updated', { team });
   }
 
   async getLogo(req: Request, res: Response): Promise<void> {
-    const { buffer, mimeType } = await teamsService.getLogo(req.params.id);
-    res.setHeader('Content-Type', mimeType);
+    const result = await teamsService.getLogo(req.params.id);
+    if ('redirectUrl' in result) {
+      res.redirect(302, result.redirectUrl);
+      return;
+    }
+    res.setHeader('Content-Type', result.mimeType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.status(200).send(buffer);
+    res.status(200).send(result.buffer);
   }
 
   async remove(req: Request, res: Response): Promise<void> {

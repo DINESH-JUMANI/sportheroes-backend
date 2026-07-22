@@ -1,6 +1,6 @@
 import { MatchSideType, MatchStatusType, Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
 import {
   applyBestOfSets,
@@ -26,6 +26,25 @@ const matchDetailInclude = {
   sport: true,
   venueRef: true,
 };
+
+/** Only the user who started the match may control live scoring. */
+export function assertMatchScorer(
+  match: { startedBy: string | null },
+  userId: string,
+): void {
+  if (!match.startedBy) {
+    throw new ForbiddenError(
+      'Match has no scorer yet. Call POST /matches/:id/start first.',
+      'MATCH_NO_SCORER',
+    );
+  }
+  if (match.startedBy !== userId) {
+    throw new ForbiddenError(
+      'Only the player who started the match can score or control it',
+      'NOT_MATCH_SCORER',
+    );
+  }
+}
 
 export class MatchesService {
   async create(userId: string, input: CreateMatchInput) {
@@ -208,10 +227,34 @@ export class MatchesService {
       throw new BadRequestError(`Cannot transition from ${match.status} to ${newStatus}`);
     }
 
+    // Start: any authenticated user becomes the exclusive scorer
+    const isStart = match.status === 'scheduled' && newStatus === 'ongoing';
+    // Pause / resume / cancel-after-start: only scorer (cancel from scheduled: creator or anyone?)
+    if (!isStart) {
+      if (newStatus === 'cancelled' && match.status === 'scheduled') {
+        // allow creator to cancel before start
+        if (match.createdBy !== userId) {
+          throw new ForbiddenError('Only the match creator can cancel before start');
+        }
+      } else if (newStatus === 'cancelled') {
+        // after start: scorer or creator
+        if (match.startedBy !== userId && match.createdBy !== userId) {
+          throw new ForbiddenError('Only the scorer or creator can cancel this match');
+        }
+      } else {
+        assertMatchScorer(match, userId);
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const data: Prisma.MatchUpdateInput = { status: newStatus };
 
-      if (newStatus === 'ongoing' && !match.startedAt) data.startedAt = new Date();
+      if (isStart) {
+        data.startedAt = match.startedAt ?? new Date();
+        data.starter = { connect: { id: userId } };
+      } else if (newStatus === 'ongoing' && !match.startedAt) {
+        data.startedAt = new Date();
+      }
       if (newStatus === 'cancelled') data.finishedAt = new Date();
 
       const result = await tx.match.update({
@@ -232,7 +275,12 @@ export class MatchesService {
       return result;
     });
 
-    Logger.info('Match status changed', { matchId, from: match.status, to: newStatus });
+    Logger.info('Match status changed', {
+      matchId,
+      from: match.status,
+      to: newStatus,
+      startedBy: isStart ? userId : match.startedBy,
+    });
     return toPublicMatch(updated);
   }
 
@@ -255,6 +303,8 @@ export class MatchesService {
     if (match.status === 'completed' && match.winnerSide) {
       return this.getById(matchId);
     }
+
+    assertMatchScorer(match, userId);
 
     const format = parseMatchFormat(match.matchFormat);
     const winnerSide = this.resolveWinnerSide(
@@ -359,11 +409,17 @@ export class MatchesService {
   }
 
   async recordPoint(matchId: string, userId: string, scoringSide: 'A' | 'B') {
+    const match = await prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundError('Match not found');
+    assertMatchScorer(match, userId);
     await matchScoringService.recordPoint(matchId, userId, scoringSide);
     return this.getById(matchId);
   }
 
   async finishSet(matchId: string, userId: string, input: FinishSetInput = {}) {
+    const match = await prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundError('Match not found');
+    assertMatchScorer(match, userId);
     await matchScoringService.finishSet(
       matchId,
       userId,
@@ -373,6 +429,9 @@ export class MatchesService {
   }
 
   async undoPoint(matchId: string, userId: string) {
+    const match = await prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundError('Match not found');
+    assertMatchScorer(match, userId);
     await matchScoringService.undoLastPoint(matchId, userId);
     return this.getById(matchId);
   }

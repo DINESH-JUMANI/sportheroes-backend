@@ -2,7 +2,6 @@ import type { User } from '@prisma/client';
 
 export interface PublicUser {
   id: string;
-  firebaseUid: string;
   email: string | null;
   phoneNumber: string | null;
   fullName: string;
@@ -15,6 +14,8 @@ export interface PublicUser {
   country: string | null;
   isActive: boolean;
   isProfileComplete: boolean;
+  /** false for users added via teams/matches until they set a password */
+  hasPassword: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,7 +34,6 @@ export interface LoginResult {
 }
 
 export function toPublicUser(user: User): PublicUser {
-  // New accounts are seeded with phone number (or a Player placeholder) as fullName.
   const isPlaceholderName =
     !user.fullName ||
     user.fullName === user.phoneNumber ||
@@ -43,7 +43,6 @@ export function toPublicUser(user: User): PublicUser {
 
   return {
     id: user.id,
-    firebaseUid: user.firebaseUid,
     email: user.email,
     phoneNumber: user.phoneNumber,
     fullName: user.fullName,
@@ -58,6 +57,7 @@ export function toPublicUser(user: User): PublicUser {
     country: user.country,
     isActive: user.isActive,
     isProfileComplete,
+    hasPassword: Boolean(user.passwordHash),
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

@@ -1,13 +1,6 @@
 import { z } from 'zod';
 import { paginationSchema } from '../../utils/pagination';
 
-const imageMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-
-const ticketImageSchema = z.object({
-  imageBase64: z.string().min(1).max(7_000_000),
-  mimeType: imageMimeTypeSchema,
-});
-
 export const listConcernsQuerySchema = paginationSchema.extend({
   activeOnly: z
     .enum(['true', 'false'])
@@ -43,7 +36,8 @@ export const createTicketSchema = z
     /** Required when the selected concern has isOther=true */
     otherConcernText: z.string().trim().min(2).max(200).optional(),
     description: z.string().trim().min(10).max(5000),
-    images: z.array(ticketImageSchema).max(5).optional(),
+    /** Public Supabase Storage URLs (upload via POST /support/upload-image first) */
+    imageUrls: z.array(z.string().url()).max(5).optional(),
   })
   .strict();
 

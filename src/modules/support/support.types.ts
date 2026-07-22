@@ -20,6 +20,7 @@ export interface PublicSupportConcern {
 
 export interface PublicTicketImageMeta {
   id: string;
+  imageUrl: string | null;
   mimeType: string;
   sortOrder: number;
   createdAt: string;
@@ -69,6 +70,7 @@ export function toPublicConcern(c: SupportConcern): PublicSupportConcern {
 export function toPublicTicketImageMeta(img: SupportTicketImage): PublicTicketImageMeta {
   return {
     id: img.id,
+    imageUrl: img.imageUrl,
     mimeType: img.mimeType,
     sortOrder: img.sortOrder,
     createdAt: img.createdAt.toISOString(),

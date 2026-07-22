@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { sendSuccess } from '../../utils/api-response';
+import { BadRequestError } from '../../utils/errors';
 import { supportService } from './support.service';
 
 export class SupportController {
@@ -36,6 +37,14 @@ export class SupportController {
   async createTicket(req: Request, res: Response): Promise<void> {
     const ticket = await supportService.createTicket(req.user!.id, req.body);
     sendSuccess(res, 'Support ticket created', { ticket }, 201);
+  }
+
+  async uploadImage(req: Request, res: Response): Promise<void> {
+    if (!req.file) {
+      throw new BadRequestError('file is required (multipart field name: file)');
+    }
+    const result = await supportService.uploadImage(req.user!.id, req.file);
+    sendSuccess(res, 'Image uploaded', result, 201);
   }
 
   async listTickets(req: Request, res: Response): Promise<void> {
@@ -78,14 +87,18 @@ export class SupportController {
   }
 
   async getTicketImage(req: Request, res: Response): Promise<void> {
-    const { buffer, mimeType } = await supportService.getTicketImage(
+    const result = await supportService.getTicketImage(
       req.params.id,
       req.params.imageId,
       req.user!.id,
     );
-    res.setHeader('Content-Type', mimeType);
+    if ('redirectUrl' in result) {
+      res.redirect(302, result.redirectUrl);
+      return;
+    }
+    res.setHeader('Content-Type', result.mimeType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.status(200).send(buffer);
+    res.status(200).send(result.buffer);
   }
 }
 

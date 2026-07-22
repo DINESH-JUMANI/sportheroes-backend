@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 /**
  * Normalize phone numbers for lookup and storage.
  * Strips spaces/dashes; ensures leading + when digits-only with country code.
@@ -9,11 +11,16 @@ export function normalizePhoneNumber(raw: string): string {
   return trimmed;
 }
 
-export function placeholderFirebaseUid(phoneNumber: string): string {
+/** Placeholder auth uid for users added by phone before they set a password. */
+export function placeholderAuthUid(phoneNumber: string): string {
   const normalized = normalizePhoneNumber(phoneNumber);
   return `pending_phone_${normalized.replace(/[^0-9+]/g, '')}`;
 }
 
-export function isPlaceholderFirebaseUid(firebaseUid: string): boolean {
-  return firebaseUid.startsWith('pending_phone_');
+export function isPlaceholderAuthUid(authUid: string): boolean {
+  return authUid.startsWith('pending_phone_');
+}
+
+export function localAuthUid(): string {
+  return `local_${randomUUID()}`;
 }

@@ -64,6 +64,8 @@ export interface PublicMatch {
   status: string;
   winnerSide: string | null;
   createdBy: string;
+  /** User who started the match — only they can score / pause / resume / finish */
+  startedBy: string | null;
   participants?: PublicMatchParticipant[];
   sets?: PublicMatchSet[];
   createdAt: string;
@@ -154,6 +156,7 @@ export function toPublicMatch(match: MatchWithRelations): PublicMatch {
     status: match.status,
     winnerSide: match.winnerSide,
     createdBy: match.createdBy,
+    startedBy: match.startedBy ?? null,
     participants: match.participants?.map(toPublicMatchParticipant),
     sets: match.sets?.map(toPublicMatchSet),
     createdAt: match.createdAt.toISOString(),

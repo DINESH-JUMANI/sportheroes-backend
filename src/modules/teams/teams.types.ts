@@ -75,7 +75,7 @@ export function toPublicTeam(team: TeamWithRelations): PublicTeam {
     name: team.name,
     shortName: team.shortName,
     logoUrl: team.logoUrl,
-    hasLogo: !!team.logoBlob && team.logoBlob.length > 0,
+    hasLogo: Boolean(team.logoUrl) || (!!team.logoBlob && team.logoBlob.length > 0),
     logoMimeType: team.logoMimeType,
     description: team.description,
     captainId: team.captainId,

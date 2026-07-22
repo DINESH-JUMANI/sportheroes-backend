@@ -39,7 +39,7 @@ function sanitizeBody(body: unknown): unknown {
   if (!body || typeof body !== 'object') return body;
 
   const clone = { ...(body as Record<string, unknown>) };
-  for (const key of ['idToken', 'password', 'token', 'accessToken', 'authorization']) {
+  for (const key of ['idToken', 'password', 'currentPassword', 'newPassword', 'token', 'accessToken', 'authorization']) {
     if (key in clone) {
       clone[key] = '[REDACTED]';
     }

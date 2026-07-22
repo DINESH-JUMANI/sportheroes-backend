@@ -1,7 +1,7 @@
 import type { User } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError } from './errors';
-import { isPlaceholderFirebaseUid, normalizePhoneNumber, placeholderFirebaseUid } from './phone';
+import { normalizePhoneNumber, placeholderAuthUid } from './phone';
 import { ensureUserLinkedToAllSports } from './user-sports';
 
 export interface ResolveUserByPhoneInput {
@@ -11,6 +11,7 @@ export interface ResolveUserByPhoneInput {
 
 /**
  * Find an active user by phone, or create a placeholder user when fullName is provided.
+ * Placeholder users have no password until they call POST /auth/set-password.
  */
 export async function findOrCreateUserByPhone(input: ResolveUserByPhoneInput): Promise<User> {
   const phoneNumber = normalizePhoneNumber(input.phoneNumber);
@@ -32,9 +33,10 @@ export async function findOrCreateUserByPhone(input: ResolveUserByPhoneInput): P
 
   const user = await prisma.user.create({
     data: {
-      firebaseUid: placeholderFirebaseUid(phoneNumber),
+      authUid: placeholderAuthUid(phoneNumber),
       phoneNumber,
       fullName: input.fullName.trim(),
+      passwordHash: null,
     },
   });
 
@@ -58,22 +60,18 @@ export async function resolveUserIdByPhone(
   return user.id;
 }
 
-export async function mergePlaceholderUserOnLogin(
-  firebaseUid: string,
-  phoneNumber: string | null,
-): Promise<User | null> {
-  if (!phoneNumber) return null;
-
-  const normalized = normalizePhoneNumber(phoneNumber);
-  const byPhone = await prisma.user.findFirst({
-    where: { phoneNumber: normalized, isActive: true },
-  });
-
-  if (!byPhone || !isPlaceholderFirebaseUid(byPhone.firebaseUid)) return null;
-  if (byPhone.firebaseUid === firebaseUid) return byPhone;
-
-  return prisma.user.update({
-    where: { id: byPhone.id },
-    data: { firebaseUid },
-  });
+export async function findUserByEmailOrPhone(params: {
+  email?: string | null;
+  phoneNumber?: string | null;
+}): Promise<User | null> {
+  if (params.email) {
+    const byEmail = await prisma.user.findFirst({
+      where: { email: params.email.trim().toLowerCase(), isActive: true },
+    });
+    if (byEmail) return byEmail;
+  }
+  if (params.phoneNumber) {
+    return findUserByPhone(params.phoneNumber);
+  }
+  return null;
 }

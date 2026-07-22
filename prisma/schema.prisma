@@ -106,9 +106,10 @@ enum SupportTicketStatusType {
 
 model User {
   id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  firebaseUid       String     @unique @map("firebase_uid") @db.VarChar(128)
+  authUid           String     @unique @map("auth_uid") @db.VarChar(128)
   email             String?    @unique @db.VarChar(255)
   phoneNumber       String?    @map("phone_number") @db.VarChar(20)
+  passwordHash      String?    @map("password_hash") @db.Text
   fullName          String     @map("full_name") @db.VarChar(150)
   displayName       String?    @map("display_name") @db.VarChar(50)
   profilePictureUrl String?    @map("profile_picture_url") @db.Text
@@ -130,6 +131,7 @@ model User {
   tournamentParticipants TournamentParticipant[]
   tournamentStandings  TournamentStanding[]
   matchesCreated       Match[]                @relation("MatchCreator")
+  matchesStarted       Match[]                @relation("MatchStarter")
   matchParticipants    MatchParticipant[]
   matchPointsRecorded  MatchPoint[]
   matchStatusChanges   MatchStatusLog[]
@@ -335,6 +337,7 @@ model Match {
   status            MatchStatusType @default(scheduled)
   winnerSide        MatchSideType?  @map("winner_side")
   createdBy         String          @map("created_by") @db.Uuid
+  startedBy         String?         @map("started_by") @db.Uuid
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -343,6 +346,7 @@ model Match {
   tournamentRound TournamentRound?   @relation(fields: [tournamentRoundId], references: [id], onDelete: SetNull)
   venueRef        Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)
   creator         User               @relation("MatchCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  starter         User?              @relation("MatchStarter", fields: [startedBy], references: [id], onDelete: SetNull)
   participants    MatchParticipant[]
   sets            MatchSet[]
   points          MatchPoint[]
@@ -351,6 +355,7 @@ model Match {
   @@index([tournamentId], map: "idx_matches_tournament")
   @@index([status], map: "idx_matches_status")
   @@index([venueId], map: "idx_matches_venue")
+  @@index([startedBy], map: "idx_matches_started_by")
   @@map("matches")
 }
 
@@ -643,7 +648,8 @@ model SupportTicket {
 model SupportTicketImage {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ticketId     String   @map("ticket_id") @db.Uuid
-  imageBlob    Bytes    @map("image_blob")
+  imageUrl     String?  @map("image_url") @db.Text
+  imageBlob    Bytes?   @map("image_blob")
   mimeType     String   @map("mime_type") @db.VarChar(50)
   sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

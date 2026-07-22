@@ -40,7 +40,7 @@ export const config = {
   },
 
   auth: {
-    /** App JWT signing secret */
+    /** App JWT signing secret (our API tokens — not the Supabase JWT) */
     jwtSecret: process.env.JWT_SECRET ?? 'change-me-in-production',
     /** Access token lifetime in days (default: 7) */
     tokenExpiryDays: optionalEnvInt('AUTH_TOKEN_EXPIRY_DAYS', 7),
@@ -48,14 +48,12 @@ export const config = {
     jwtIssuer: optionalEnv('JWT_ISSUER', 'sportheroes-api'),
   },
 
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID ?? '',
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? '',
-    /**
-     * Private key may contain escaped newlines when stored in .env.
-     * Normalize them so firebase-admin can parse the PEM.
-     */
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
+  supabase: {
+    url: process.env.SUPABASE_URL ?? '',
+    /** Service role key — server only */
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+    /** Anon/publishable key — documented for FE; optional on server */
+    anonKey: process.env.SUPABASE_ANON_KEY ?? '',
   },
 
   swagger: {
@@ -72,14 +70,13 @@ export function assertConfig(): void {
   if (config.env === 'production') {
     requireEnv('JWT_SECRET');
     requireEnv('DATABASE_URL');
-    requireEnv('FIREBASE_PROJECT_ID');
-    requireEnv('FIREBASE_CLIENT_EMAIL');
-    requireEnv('FIREBASE_PRIVATE_KEY');
+    requireEnv('SUPABASE_URL');
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  if (!config.firebase.projectId || !config.firebase.clientEmail || !config.firebase.privateKey) {
+  if (!config.supabase.url || !config.supabase.serviceRoleKey) {
     Logger.warn(
-      'Firebase credentials are incomplete. Phone auth verification will fail until they are set.',
+      'Supabase Storage credentials are incomplete. Image uploads will fail until SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are set.',
     );
   }
 
@@ -89,5 +86,6 @@ export function assertConfig(): void {
     logLevel: config.logLevel,
     swaggerEnabled: config.swagger.enabled,
     authTokenExpiryDays: config.auth.tokenExpiryDays,
+    supabaseConfigured: Boolean(config.supabase.url && config.supabase.serviceRoleKey),
   });
 }

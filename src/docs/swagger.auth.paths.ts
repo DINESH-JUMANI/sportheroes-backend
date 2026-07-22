@@ -1,125 +1,145 @@
 /**
  * @openapi
- * /api/v1/auth/login:
+ * /api/v1/auth/register:
  *   post:
  *     tags: [Auth]
- *     summary: Login or register with Firebase phone auth
- *     description: Flutter sends Firebase ID token after OTP. Returns app JWT (default 7 days).
+ *     summary: Register with email and/or phone + password
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [idToken]
+ *             required: [password, fullName]
  *             properties:
- *               idToken:
- *                 type: string
- *                 description: Firebase ID token from Flutter Firebase Auth SDK
- *                 example: eyJhbGciOiJSUzI1NiIs...
+ *               email: { type: string, example: user@example.com }
+ *               phoneNumber: { type: string, example: '+919000000001' }
+ *               password: { type: string, minLength: 8 }
+ *               fullName: { type: string }
+ *     responses:
+ *       201:
+ *         description: Account created + app JWT
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *
+ * /api/v1/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Login with email or phone + password
+ *     description: |
+ *       Send either `email` or `phoneNumber` plus `password`.
+ *       If the user exists but has no password (added via teams/matches), returns 400 `PASSWORD_NOT_SET`
+ *       — FE should call POST /auth/set-password.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               email: { type: string }
+ *               phoneNumber: { type: string }
+ *               password: { type: string }
  *     responses:
  *       200:
- *         description: Existing user logged in
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: Login successful }
- *                 data:
- *                   type: object
- *                   properties:
- *                     isNewUser: { type: boolean, example: false }
- *                     user: { $ref: '#/components/schemas/User' }
- *                     tokens: { $ref: '#/components/schemas/AuthTokens' }
- *       201:
- *         description: New user created and logged in
+ *         description: Login successful + app JWT
  *       400:
- *         $ref: '#/components/responses/BadRequest'
+ *         description: PASSWORD_NOT_SET — redirect to set-password
  *       401:
- *         description: Invalid or expired Firebase token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             example:
- *               success: false
- *               error:
- *                 code: INVALID_FIREBASE_TOKEN
- *                 message: Invalid or expired Firebase ID token
- *       500:
- *         $ref: '#/components/responses/InternalError'
+ *         description: Invalid credentials
+ *
+ * /api/v1/auth/set-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Set password for users without one (placeholder accounts)
+ *     description: Used when a user was added via team/match and passwordHash is null.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               email: { type: string }
+ *               phoneNumber: { type: string }
+ *               password: { type: string, minLength: 8 }
+ *               fullName: { type: string }
+ *     responses:
+ *       200:
+ *         description: Password set + app JWT
+ *       400:
+ *         description: Password already set
+ *       404:
+ *         description: User not found
+ *
+ * /api/v1/auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password using current password (no OTP)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               email: { type: string }
+ *               phoneNumber: { type: string }
+ *               currentPassword: { type: string }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       200:
+ *         description: Password reset + new app JWT
+ *       401:
+ *         description: Invalid current password
+ *
+ * /api/v1/auth/change-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Change password while logged in
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword: { type: string }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       200:
+ *         description: Password changed
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  *
  * /api/v1/auth/dev-login:
  *   post:
  *     tags: [Auth]
  *     summary: "[DEV ONLY] Get 1-year JWT for seeded test user"
- *     description: |
- *       **Development only** (`NODE_ENV=development`). No Firebase required.
- *       Run `npm run db:seed:dev` first to seed the test user.
- *       Returns a JWT valid for 365 days — use in Swagger Authorize button.
  *     responses:
  *       200:
  *         description: Dev token issued
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: Dev login successful }
- *                 data:
- *                   type: object
- *                   properties:
- *                     isNewUser: { type: boolean, example: false }
- *                     user: { $ref: '#/components/schemas/User' }
- *                     tokens:
- *                       allOf:
- *                         - $ref: '#/components/schemas/AuthTokens'
- *                       example:
- *                         accessToken: eyJhbGciOiJIUzI1NiIs...
- *                         tokenType: Bearer
- *                         expiresIn: 365d
- *                         expiresAt: "2027-07-13T00:00:00.000Z"
  *       403:
- *         description: Not available in production
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       500:
- *         $ref: '#/components/responses/InternalError'
+ *         description: Disabled in production
  *
  * /api/v1/auth/me:
  *   get:
  *     tags: [Auth]
- *     summary: Get authenticated user profile
+ *     summary: Get current user
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
- *         description: Current user
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 data:
- *                   type: object
- *                   properties:
- *                     user: { $ref: '#/components/schemas/User' }
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         $ref: '#/components/responses/NotFound'
+ *         description: Current user (includes hasPassword)
  *
  * /api/v1/auth/profile:
  *   patch:
  *     tags: [Auth]
- *     summary: Update authenticated user profile
+ *     summary: Update profile fields
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -128,11 +148,12 @@
  *           schema:
  *             type: object
  *             properties:
- *               fullName: { type: string, example: Rahul Sharma }
- *               displayName: { type: string, example: Rahul }
- *               email: { type: string, format: email }
- *               profilePictureUrl: { type: string, format: uri }
- *               dateOfBirth: { type: string, format: date, example: "1998-05-12" }
+ *               fullName: { type: string }
+ *               displayName: { type: string, nullable: true }
+ *               email: { type: string, nullable: true }
+ *               phoneNumber: { type: string, nullable: true }
+ *               profilePictureUrl: { type: string, nullable: true }
+ *               dateOfBirth: { type: string }
  *               gender: { type: string, enum: [male, female, other, prefer_not_to_say] }
  *               city: { type: string }
  *               state: { type: string }
@@ -140,39 +161,31 @@
  *     responses:
  *       200:
  *         description: Profile updated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 message: { type: string }
- *                 data:
- *                   type: object
- *                   properties:
- *                     user: { $ref: '#/components/schemas/User' }
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
+ *
+ * /api/v1/auth/avatar:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Upload profile avatar to Supabase Storage
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Avatar uploaded
  *
  * /api/v1/auth/logout:
  *   post:
  *     tags: [Auth]
- *     summary: Logout (client discards token)
+ *     summary: Logout (client discards app JWT)
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
- *         description: Logout acknowledged
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string }
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
+ *         description: Logged out
  */
-
-export {};

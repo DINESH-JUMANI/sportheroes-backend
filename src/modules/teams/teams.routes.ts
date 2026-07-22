@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
+import { imageUpload } from '../../middleware/upload.middleware';
 import { validate } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 import { uuidParamSchema } from '../../utils/pagination';
@@ -11,7 +12,6 @@ import {
   lookupUserQuerySchema,
   updateMemberSchema,
   updateTeamSchema,
-  uploadTeamLogoSchema,
 } from './teams.validators';
 import { z } from 'zod';
 
@@ -60,7 +60,7 @@ router.patch(
 router.put(
   '/:id/logo',
   validate(uuidParamSchema, 'params'),
-  validate(uploadTeamLogoSchema),
+  imageUpload.single('file'),
   asyncHandler(teamsController.uploadLogo.bind(teamsController)),
 );
 router.delete(

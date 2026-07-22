@@ -1,9 +1,11 @@
 import { Prisma, SupportTicketStatusType } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { prisma } from '../../config/prisma';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { Logger } from '../../utils/logger';
 import { buildPaginationMeta, getPagination } from '../../utils/pagination';
-import { decodeImageBase64, toPublicConcern, toPublicTicket } from './support.types';
+import { extensionForMime, uploadToSupabase } from '../../utils/storage';
+import { toPublicConcern, toPublicTicket } from './support.types';
 import type {
   CreateConcernInput,
   CreateTicketInput,
@@ -18,6 +20,7 @@ const ticketInclude = {
     select: {
       id: true,
       ticketId: true,
+      imageUrl: true,
       mimeType: true,
       sortOrder: true,
       createdAt: true,
@@ -139,14 +142,7 @@ export class SupportService {
       throw new BadRequestError('otherConcernText is required when concern is "Other"');
     }
 
-    const images = input.images ?? [];
-    for (const img of images) {
-      const bytes = decodeImageBase64(img.imageBase64);
-      if (bytes.length === 0) throw new BadRequestError('Invalid image data');
-      if (bytes.length > 5 * 1024 * 1024) {
-        throw new BadRequestError('Each image must be under 5MB');
-      }
-    }
+    const imageUrls = input.imageUrls ?? [];
 
     const ticket = await prisma.$transaction(async (tx) => {
       const ticketNumber = await this.nextTicketNumber(tx);
@@ -160,9 +156,9 @@ export class SupportService {
           status: 'open',
           createdBy: userId,
           images: {
-            create: images.map((img, index) => ({
-              imageBlob: Buffer.from(decodeImageBase64(img.imageBase64)),
-              mimeType: img.mimeType,
+            create: imageUrls.map((imageUrl, index) => ({
+              imageUrl,
+              mimeType: 'image/jpeg',
               sortOrder: index,
             })),
           },
@@ -185,6 +181,19 @@ export class SupportService {
       userId,
     });
     return toPublicTicket(ticket);
+  }
+
+  /** Upload a support image to Supabase Storage; returns public URL for createTicket.imageUrls */
+  async uploadImage(userId: string, file: Express.Multer.File): Promise<{ url: string }> {
+    const path = `users/${userId}/${randomUUID()}.${extensionForMime(file.mimetype)}`;
+    const url = await uploadToSupabase({
+      bucket: 'support-tickets',
+      path,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      upsert: false,
+    });
+    return { url };
   }
 
   async listTickets(
@@ -213,6 +222,7 @@ export class SupportService {
             select: {
               id: true,
               ticketId: true,
+              imageUrl: true,
               mimeType: true,
               sortOrder: true,
               createdAt: true,
@@ -292,7 +302,11 @@ export class SupportService {
     return toPublicTicket(updated);
   }
 
-  async getTicketImage(ticketId: string, imageId: string, userId: string) {
+  async getTicketImage(
+    ticketId: string,
+    imageId: string,
+    userId: string,
+  ): Promise<{ redirectUrl: string } | { buffer: Buffer; mimeType: string }> {
     const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
     if (!ticket) throw new NotFoundError('Ticket not found');
     if (ticket.createdBy !== userId) {
@@ -303,6 +317,11 @@ export class SupportService {
       where: { id: imageId, ticketId },
     });
     if (!image) throw new NotFoundError('Image not found');
+
+    if (image.imageUrl) {
+      return { redirectUrl: image.imageUrl };
+    }
+    if (!image.imageBlob) throw new NotFoundError('Image not found');
 
     return {
       buffer: Buffer.from(image.imageBlob),

@@ -1,7 +1,72 @@
 import { z } from 'zod';
+import { normalizePhoneNumber } from '../../utils/phone';
 
-export const loginSchema = z.object({
-  idToken: z.string().min(1, 'idToken is required'),
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128, 'Password must be at most 128 characters');
+
+const phoneSchema = z
+  .string()
+  .trim()
+  .min(8)
+  .max(20)
+  .transform((v) => normalizePhoneNumber(v));
+
+const emailSchema = z.string().trim().email().max(255).transform((v) => v.toLowerCase());
+
+export const registerSchema = z
+  .object({
+    email: emailSchema.optional(),
+    phoneNumber: phoneSchema.optional(),
+    password: passwordSchema,
+    fullName: z.string().trim().min(2).max(150),
+  })
+  .refine((d) => Boolean(d.email) || Boolean(d.phoneNumber), {
+    message: 'Either email or phoneNumber is required',
+    path: ['email'],
+  });
+
+export const loginSchema = z
+  .object({
+    email: emailSchema.optional(),
+    phoneNumber: phoneSchema.optional(),
+    password: z.string().min(1, 'Password is required'),
+  })
+  .refine((d) => Boolean(d.email) || Boolean(d.phoneNumber), {
+    message: 'Either email or phoneNumber is required',
+    path: ['email'],
+  });
+
+/** First-time password for users created via teams/matches (passwordHash is null). */
+export const setPasswordSchema = z
+  .object({
+    email: emailSchema.optional(),
+    phoneNumber: phoneSchema.optional(),
+    password: passwordSchema,
+    fullName: z.string().trim().min(2).max(150).optional(),
+  })
+  .refine((d) => Boolean(d.email) || Boolean(d.phoneNumber), {
+    message: 'Either email or phoneNumber is required',
+    path: ['email'],
+  });
+
+/** Reset password when you already know the current password (no OTP). */
+export const resetPasswordSchema = z
+  .object({
+    email: emailSchema.optional(),
+    phoneNumber: phoneSchema.optional(),
+    currentPassword: z.string().min(1),
+    newPassword: passwordSchema,
+  })
+  .refine((d) => Boolean(d.email) || Boolean(d.phoneNumber), {
+    message: 'Either email or phoneNumber is required',
+    path: ['email'],
+  });
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,
 });
 
 export const updateProfileSchema = z
@@ -20,6 +85,7 @@ export const updateProfileSchema = z
       .nullable()
       .optional(),
     email: z.string().trim().email('Invalid email address').max(255).nullable().optional(),
+    phoneNumber: phoneSchema.nullable().optional(),
     profilePictureUrl: z.string().url('Invalid profile picture URL').nullable().optional(),
     dateOfBirth: z
       .string()
@@ -40,5 +106,9 @@ export const updateProfileSchema = z
     message: 'At least one profile field must be provided',
   });
 
+export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
