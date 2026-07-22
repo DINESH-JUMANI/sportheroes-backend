@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from '../config/supabase';
+import { getSupabaseStorage } from '../config/supabase';
 import { config } from '../config/config';
 import { BadRequestError } from './errors';
 import { Logger } from './logger';
@@ -47,8 +47,8 @@ export async function uploadToSupabase(params: {
     throw new BadRequestError('Image must be under 5MB');
   }
 
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage.from(params.bucket).upload(params.path, params.buffer, {
+  const storage = getSupabaseStorage();
+  const { error } = await storage.from(params.bucket).upload(params.path, params.buffer, {
     contentType: params.contentType,
     upsert: params.upsert ?? true,
   });
@@ -58,7 +58,7 @@ export async function uploadToSupabase(params: {
     throw new BadRequestError(`Failed to upload image: ${error.message}`);
   }
 
-  const { data } = supabase.storage.from(params.bucket).getPublicUrl(params.path);
+  const { data } = storage.from(params.bucket).getPublicUrl(params.path);
   if (!data?.publicUrl) {
     throw new BadRequestError('Failed to resolve public URL for uploaded image');
   }
@@ -74,8 +74,8 @@ export async function uploadToSupabase(params: {
 /** Best-effort delete; ignores missing objects. */
 export async function deleteFromSupabase(bucket: StorageBucket, path: string): Promise<void> {
   try {
-    const supabase = getSupabaseAdmin();
-    await supabase.storage.from(bucket).remove([path]);
+    const storage = getSupabaseStorage();
+    await storage.from(bucket).remove([path]);
   } catch (error) {
     Logger.warn('Supabase storage delete failed', { bucket, path, error });
   }

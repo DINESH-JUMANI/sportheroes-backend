@@ -5,6 +5,7 @@ import { Logger } from '../../utils/logger';
 import { authService } from './auth.service';
 import type {
   ChangePasswordInput,
+  CheckAccountInput,
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
@@ -22,6 +23,11 @@ export class AuthController {
     Logger.debug('AuthController.login called');
     const result = await authService.login(req.body as LoginInput);
     sendSuccess(res, 'Login successful', result);
+  }
+
+  async checkAccount(req: Request, res: Response): Promise<void> {
+    const result = await authService.checkAccount(req.body as CheckAccountInput);
+    sendSuccess(res, 'Account check completed', result);
   }
 
   async setPassword(req: Request, res: Response): Promise<void> {

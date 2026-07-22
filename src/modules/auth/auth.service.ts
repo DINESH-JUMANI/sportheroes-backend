@@ -17,13 +17,14 @@ import { findUserByEmailOrPhone } from '../../utils/user-resolver';
 import { ensureUserLinkedToAllSports } from '../../utils/user-sports';
 import type {
   ChangePasswordInput,
+  CheckAccountInput,
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
   SetPasswordInput,
   UpdateProfileInput,
 } from './auth.validators';
-import { LoginResult, PublicUser, toPublicUser } from './auth.types';
+import { AccountCheckResult, LoginResult, PublicUser, toPublicUser } from './auth.types';
 
 function buildTokens(user: User) {
   const signed = signAccessToken({
@@ -98,6 +99,23 @@ export class AuthService {
       isNewUser: true,
       user: toPublicUser(user),
       tokens: buildTokens(user),
+    };
+  }
+
+  /** Public probe: does an active account exist and does it have a password? */
+  async checkAccount(input: CheckAccountInput): Promise<AccountCheckResult> {
+    const user = await findUserByEmailOrPhone({
+      email: input.email,
+      phoneNumber: input.phoneNumber,
+    });
+
+    if (!user || !user.isActive) {
+      return { exists: false, hasPassword: false };
+    }
+
+    return {
+      exists: true,
+      hasPassword: Boolean(user.passwordHash),
     };
   }
 

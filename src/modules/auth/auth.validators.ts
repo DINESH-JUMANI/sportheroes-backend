@@ -38,6 +38,17 @@ export const loginSchema = z
     path: ['email'],
   });
 
+/** Public account probe for login step 1 (exists + has password). */
+export const checkAccountSchema = z
+  .object({
+    email: emailSchema.optional(),
+    phoneNumber: phoneSchema.optional(),
+  })
+  .refine((d) => Boolean(d.email) || Boolean(d.phoneNumber), {
+    message: 'Either email or phoneNumber is required',
+    path: ['email'],
+  });
+
 /** First-time password for users created via teams/matches (passwordHash is null). */
 export const setPasswordSchema = z
   .object({
@@ -108,6 +119,7 @@ export const updateProfileSchema = z
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type CheckAccountInput = z.infer<typeof checkAccountSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

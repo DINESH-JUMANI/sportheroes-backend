@@ -39,6 +39,36 @@ All success/error responses still use `{ success, message, data }`.
 
 Need **at least one** of `email` / `phoneNumber`. Returns `data.tokens.accessToken` (app JWT).
 
+### Check account (login step 1)
+
+**POST** `/api/v1/auth/check` — public, no token
+
+```json
+{ "email": "user@example.com" }
+```
+
+or
+
+```json
+{ "phoneNumber": "+919000000001" }
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "message": "Account check completed",
+  "data": { "exists": true, "hasPassword": true }
+}
+```
+
+| `exists` | `hasPassword` | FE action |
+|----------|---------------|-----------|
+| `false` | any | → Register (prefill email/phone) |
+| `true` | `false` | → Set password screen |
+| `true` | `true` | → Show password field (login step 2) |
+
 ### Login (email **or** phone)
 
 **POST** `/api/v1/auth/login`

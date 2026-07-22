@@ -22,6 +22,38 @@
  *       409:
  *         $ref: '#/components/responses/Conflict'
  *
+ * /api/v1/auth/check:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Check if an account exists and has a password (login step 1)
+ *     description: |
+ *       Public endpoint — no auth token. Send either `email` or `phoneNumber`.
+ *       Used by FE before showing password field, set-password screen, or register.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email: { type: string, example: user@example.com }
+ *               phoneNumber: { type: string, example: '+919000000001' }
+ *     responses:
+ *       200:
+ *         description: Account check completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Account check completed }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     exists: { type: boolean }
+ *                     hasPassword: { type: boolean }
+ *
  * /api/v1/auth/login:
  *   post:
  *     tags: [Auth]

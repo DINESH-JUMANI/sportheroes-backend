@@ -1,26 +1,30 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { StorageClient } from '@supabase/storage-js';
 import { config } from './config';
 import { Logger } from '../utils/logger';
 
-let adminClient: SupabaseClient | null = null;
+let storageClient: StorageClient | null = null;
 
-/** Service-role client — never expose this key to the FE. */
-export function getSupabaseAdmin(): SupabaseClient {
-  if (adminClient) return adminClient;
+/**
+ * Service-role Storage client — no Realtime/WebSocket (safe on Node 20 / Vercel).
+ * Never expose the service role key to the FE.
+ */
+export function getSupabaseStorage(): StorageClient {
+  if (storageClient) return storageClient;
 
   if (!config.supabase.url || !config.supabase.serviceRoleKey) {
     throw new Error('Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)');
   }
 
-  adminClient = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+  const baseUrl = config.supabase.url.replace(/\/$/, '');
+  const key = config.supabase.serviceRoleKey;
+
+  storageClient = new StorageClient(`${baseUrl}/storage/v1`, {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
   });
 
-  Logger.debug('Supabase admin client initialized');
-  return adminClient;
+  Logger.debug('Supabase storage client initialized');
+  return storageClient;
 }
 
 export function isSupabaseConfigured(): boolean {

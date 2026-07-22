@@ -33,6 +33,11 @@ export interface LoginResult {
   tokens: AuthTokens;
 }
 
+export interface AccountCheckResult {
+  exists: boolean;
+  hasPassword: boolean;
+}
+
 export function toPublicUser(user: User): PublicUser {
   const isPlaceholderName =
     !user.fullName ||

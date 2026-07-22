@@ -6,6 +6,7 @@ import { asyncHandler } from '../../utils/async-handler';
 import { authController } from './auth.controller';
 import {
   changePasswordSchema,
+  checkAccountSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
@@ -21,6 +22,11 @@ router.post(
   asyncHandler(authController.register.bind(authController)),
 );
 router.post('/login', validate(loginSchema), asyncHandler(authController.login.bind(authController)));
+router.post(
+  '/check',
+  validate(checkAccountSchema),
+  asyncHandler(authController.checkAccount.bind(authController)),
+);
 router.post(
   '/set-password',
   validate(setPasswordSchema),
